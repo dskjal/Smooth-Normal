@@ -7,7 +7,7 @@ bl_info = {
     "author" : "dskjal",                  
     "version" : (1,0),                  
     "blender" : (2, 7, 7),              
-    "location" : "UV Mapping > Hoge",   
+    "location" : "",   
     "description" : "Smooth Custom Normal(s)",   
     "warning" : "",
     "wiki_url" : "https://github.com/dskjal/Normal-Smooth-Tool",                    
