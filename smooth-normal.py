@@ -15,8 +15,7 @@ bl_info = {
     "category" : "Mesh"                   
 }
 
-def smooth_selected_normals(data):
-    #get normals
+def get_normals(data):
     normals = [mathutils.Vector((0.0,0.0,0.0))]*len(data.vertices)
     if data.has_custom_normals:
         data.calc_normals_split()
@@ -27,7 +26,11 @@ def smooth_selected_normals(data):
     else:
         for i in data.vertices:
             normals[i.index] = i.normal
+            
+    return normals
 
+def smooth_selected_normals(data):
+    normals = get_normals(data)
     out_normals = copy.deepcopy(normals)  
     
     #create edge table
@@ -53,6 +56,15 @@ def smooth_selected_normals(data):
     data.calc_normals_split()
          
     
+def revert_selected_normals(data):
+    normals = get_normals(data)
+    for v in data.vertices:
+        if v.select:
+            normals[v.index] = v.normal
+            
+    data.normals_split_custom_set_from_vertices(normals)
+    data.calc_normals_split()
+
 class UI(bpy.types.Panel):
   bl_label = "Normal Edit"
   bl_space_type = "VIEW_3D"
@@ -67,10 +79,11 @@ class UI(bpy.types.Panel):
     layout = self.layout
     ob = context.object
     row = layout.row()
-    layout.operator("my.smoothnormals")
+    layout.operator("smoothnormal.smoothnormals")
+    layout.operator("smoothnormal.revert")
     
 class SmoothButton(bpy.types.Operator):
-  bl_idname = "my.smoothnormals"
+  bl_idname = "smoothnormal.smoothnormals"
   bl_label = "smooth selected normal(s)"
   
   def execute(self, context):
@@ -83,6 +96,20 @@ class SmoothButton(bpy.types.Operator):
 
     return{'FINISHED'}
 
+class RevertButton(bpy.types.Operator):
+    bl_idname = "smoothnormal.revert"
+    bl_label = "revert selected normal(s)"
+    
+    def execute(self, context):
+        o = bpy.context.active_object
+        o.data.use_auto_smooth = True
+        bpy.ops.object.mode_set(mode='OBJECT')
+        revert_selected_normals(o.data)
+        bpy.context.scene.update()
+        bpy.ops.object.mode_set(mode='EDIT')
+
+        return{'FINISHED'}
+    
 def register():
     bpy.utils.register_module(__name__)
     
