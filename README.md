@@ -1,6 +1,6 @@
 # Smooth-Normal
-This is the Blender addon that smoothing normal.  
-これは法線をならす Blender のアドオンです．
+This is the Blender addon that edit normal.  
+これは法線を編集する Blender のアドオンです．
 
 Location is Misc in tool shelf in Edit mode. "set face normal" is in face select mode only.   
 ボタンはツールシェルフの Misc にあります．
