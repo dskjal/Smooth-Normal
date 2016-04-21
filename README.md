@@ -1,6 +1,6 @@
 # Smooth-Normal
 This is the Blender addon that smoothing custom normal(s).  
-これは法線を編集する Blender のアドオンです．
+これは法線をならす Blender のアドオンです．
 
 Location is Misc in tool shelf in Edit mode.  
 ボタンはツールシェルフの Misc にあります．
