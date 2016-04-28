@@ -10,5 +10,5 @@ set face normal はフェース選択モードのときのみ表示されます�
 When smooth result is ugly, run revert selected normals(s) with all selected vertices. It may run correctly.  
 スムースがうまくいかない時は，すべての頂点を選択して revert selected normals(s) を実行するとうまくいくことがあります．
 
-Mask Color can change in Blender User Preferences > System > Custom Weight Paint Range.
+Mask Color can change in Blender User Preferences > System > Custom Weight Paint Range.  
 頂点色が見づらいときは Blender ユーザー設定 > システム > ウェイトペイントの色の設定で色を変更できます．
