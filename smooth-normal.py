@@ -8,7 +8,7 @@ from bpy.props import *
 bl_info = {
     "name" : "Normal Smooth Tool",             
     "author" : "dskjal",                  
-    "version" : (2,0),                  
+    "version" : (3,0),                  
     "blender" : (2, 7, 7),              
     "location" : "",   
     "description" : "Edit Custom Normal(s)",   
