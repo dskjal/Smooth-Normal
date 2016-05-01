@@ -2,8 +2,8 @@
 This is the Blender addon that edit normal.  
 これは法線を編集する Blender のアドオンです．
 
-Location is Misc in tool shelf in Edit mode. "set face normal" is in face select mode only.   
-ボタンはツールシェルフの Misc にあります．
+Location is Normal in tool shelf in Edit mode. "set face normal" is in face select mode only.   
+ボタンはツールシェルフの Normal にあります．
 表示されるのはエディットモードの時のみです．
 set face normal はフェース選択モードのときのみ表示されます．
 
