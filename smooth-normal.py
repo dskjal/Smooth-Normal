@@ -8,7 +8,7 @@ from bpy.props import *
 bl_info = {
     "name" : "Normal Smooth Tool",             
     "author" : "dskjal",                  
-    "version" : (4,0),                  
+    "version" : (4,1),                  
     "blender" : (2, 7, 7),              
     "location" : "",   
     "description" : "Edit Custom Normal(s)",   
@@ -294,7 +294,12 @@ def get_view_rotational_matrix(reverse=False):
     qt = mathutils.Quaternion(bpy.context.scene.ne_view_orientation)
     if reverse:
         qt.conjugate()
+
     return qt.to_matrix()
+
+def get_object_rotational_matrix():
+    #object rotation
+    return mathutils.Matrix(bpy.context.active_object.matrix_world).to_quaternion().to_matrix()
 
 def rot_vector(v, axis='X', reverse=False, angle=90):
     angle = math.radians(-angle if reverse else angle)
@@ -312,7 +317,9 @@ def view_normal_callback(self, context):
     real_normal = scn.ne_view_normal
     if scn.ne_view_sync_mode:
         mView = get_view_rotational_matrix()
-        real_normal = mView * real_normal
+        mObject = get_object_rotational_matrix()
+        mObject.transpose()
+        real_normal = mObject * mView * real_normal
     else:
         real_normal = rot_vector(real_normal)
     
@@ -328,7 +335,8 @@ def type_direction_callback(self, context):
 
     if scn.ne_view_sync_mode:
         mView = get_view_rotational_matrix(True)
-        rotated = mView * nv
+        mObject = get_object_rotational_matrix()
+        rotated = mView * mObject * nv
     else:
         rotated = rot_vector(nv, reverse=True)
 
@@ -359,7 +367,8 @@ def index_callback(self, context):
             rotated = o.data.loops[loop_index].normal
             if scn.ne_view_sync_mode:
                 mView = get_view_rotational_matrix(True)
-                rotated = mView * rotated
+                mObject = get_object_rotational_matrix()
+                rotated = mView * mObject * rotated
             else:
                 rotated = rot_vector(rotated, reverse=True)
             scn.ne_view_normal = rotated
