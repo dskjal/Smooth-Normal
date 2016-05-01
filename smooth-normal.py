@@ -8,7 +8,7 @@ from bpy.props import *
 bl_info = {
     "name" : "Normal Smooth Tool",             
     "author" : "dskjal",                  
-    "version" : (3,0),                  
+    "version" : (4,0),                  
     "blender" : (2, 7, 7),              
     "location" : "",   
     "description" : "Edit Custom Normal(s)",   
@@ -17,8 +17,8 @@ bl_info = {
     "tracker_url" : "",                 
     "category" : "Mesh"                   
 }
+#-----------------------------------------------------------debug tools--------------
 
-#----------------------------------------------------------debug tools------------------------------------------------------
 #----------------------------------------------------------helper tools-----------------------------------------------------
 def get_vertex_normal(data, index):
     normal = data.vertices[index].normal
@@ -26,11 +26,8 @@ def get_vertex_normal(data, index):
         for l in data.loops:
             if index == l.vertex_index:
                 return l.normal
-            
+    
     return normal
-
-def get_vertex_normal_bm(bm, index):
-    return bm.verts[index].normal
 
 def get_vertex_normals(data):
     normals = [(0.0,0.0,0.0)]*len(data.vertices)
@@ -70,9 +67,13 @@ def get_masked_vertices(context):
     ob = context.active_object         
     scn = context.scene
     vertex_color = scn.ne_vertex_color
-        
+
+    selected = [False]*len(ob.data.vertices)  
+    if not scn.ne_mask_name in ob.vertex_groups:
+        return selected
+
     vg_index = ob.vertex_groups[scn.ne_mask_name].index
-    selected = [False]*len(ob.data.vertices)
+    
     for v in ob.data.vertices:
         for vg in v.groups:
             if vg.group == vg_index:
@@ -85,16 +86,6 @@ def ensure_lookup_table(bm):
     bm.edges.ensure_lookup_table()
     bm.faces.ensure_lookup_table()
     
-def create_bm_vertex_to_face_table(bm):
-    to_faces = []
-    for i in range(0, len(bm.verts)):
-        to_faces.append([])
-        
-    for f in bm.faces:
-        for v in f.verts:
-            to_faces[v.index].append(f.index)
-            
-    return to_faces   
 #---------------------------------------------------------------function body----------------------------------------------------------------------
 def smooth_selected_normals(data, masked_vertices):
     normals = get_loop_normals(data)
@@ -150,7 +141,18 @@ def set_same_normal(data, normal, masked_vertices):
             normals[f] = normal
         
     data.normals_split_custom_set(normals)
-    
+   
+def set_loop_normal(data, normal, loop_index, masked_vertices):
+    normals = get_loop_normals(data)  
+    to_faces = create_face_table(data)
+        
+    #update normals
+    for l in loop_index:
+        if not masked_vertices[ data.loops[l].vertex_index ]:
+            normals[l] = normal
+
+    data.normals_split_custom_set(normals)
+
 def set_face_normal(data, masked_vertices):
     normals = get_loop_normals(data)
     for p in data.polygons:
@@ -162,54 +164,235 @@ def set_face_normal(data, masked_vertices):
     
     data.normals_split_custom_set(normals)  
 
-#----------------------------------------------------show normal tools----------------------------------------------------------
-def direction_callback(self, context):
-    context.scene.ne_type_normal = context.scene.ne_normal
-
-def get_changed_index(context):
-    out = []
+# BMesh become invalid
+# if there is no active, return None
+# else return [normal, bm.select_history.active.index, loop_index]
+def get_active_normal(context,ob):
     scn = context.scene
-    for i in range(0,3):
-        if scn.ne_old_type_normal[i]!=scn.ne_type_normal[i]:
-            out.append(i)
+    bm = bmesh.from_edit_mesh(ob.data)
+    ensure_lookup_table(bm)
+    active = bm.select_history.active
+    if not active:
+        return None
+
+    index = active.index
+    to_faces = create_face_table(ob.data)
+    loop_normals = get_loop_normals(ob.data)
+    loop_index = -1
+
+    normal = None
+    if bpy.context.scene.tool_settings.mesh_select_mode[0]:
+        #vertex
+        if scn.ne_split_mode:
+            face_index = scn.ne_view_normal_index
+            if face_index < len(to_faces[index]):
+                loop_index = to_faces[index][face_index]
+                normal = ob.data.loops[loop_index].normal
+            else:
+                normal = active.normal
+        else:
+            for f in to_faces[index]:
+                if ob.data.loops[f].vertex_index==index:
+                    normal = ob.data.loops[f].normal
+                    loop_index = ob.data.loops[f].index
+                    break
+    elif bpy.context.scene.tool_settings.mesh_select_mode[2]:
+        #face
+        normal = active.normal
+        
+    return [normal, index, loop_index]
+
+#run in edit mode
+def update_active_normal(context, ob):
+    scn = context.scene
+    normal = get_active_normal(context, ob)
+    if normal==None:
+        return
+
+    if scn.ne_split_mode:
+        loop_index = normal[2]
+        if loop_index!=-1:
+            normal = ob.data.loops[loop_index].normal
+        else:
+            normal = normal[0]
+    else:
+        normal = normal[0]
+
+    scn.ne_type_normal = normal
+
+def is_vertices_selected_bm(bm):
+    count = 0
+    for v in bm.verts:
+        if v.select:
+            count += 1
+            if count>1:
+                return True
+    return False
+
+def set_normal_to_selected(context, normal):
+    scn = context.scene
+    o = context.active_object   
+    bm = bmesh.from_edit_mesh(o.data)
+    ensure_lookup_table(bm)  
+    if not hasattr(bm.select_history.active,'index'):
+        return
+    index = bm.select_history.active.index
+    is_multi_paste = is_vertices_selected_bm(bm)
+    masked_vertices = get_masked_vertices(context)  
+
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    if scn.ne_split_mode:
+        if scn.tool_settings.mesh_select_mode[0]:
+            #split vertex mode
+            face_index = scn.ne_view_normal_index
+            to_faces = create_face_table(o.data)
+            if face_index < len(to_faces[index]):
+                loop_index = to_faces[index][face_index]                                
+                set_loop_normal(o.data, normal, [loop_index], masked_vertices)
+        if scn.tool_settings.mesh_select_mode[2]:
+            #split face mode
+            selected = [p for p in o.data.polygons if p.select]
+            loop_index = []
+            for s in selected:
+                for i in range( s.loop_start, s.loop_start + s.loop_total ):
+                    loop_index.append(i)  
+            set_loop_normal(o.data, normal, loop_index, masked_vertices)
+    else:
+        set_same_normal(o.data, normal, masked_vertices)
+
+    '''
+    if is_multi_paste or not scn.ne_split_mode:
+        set_same_normal(o.data, normal, masked_vertices)
+    elif scn.ne_split_mode and scn.tool_settings.mesh_select_mode[2]:
+        # split mode and face is selected
+        i=0
+    else:
+        face_index = scn.ne_view_normal_index
+        to_faces = create_face_table(o.data)
+        if face_index < len(to_faces[index]):
+            loop_index = to_faces[index][face_index]                                
+            set_loop_normal(o.data, normal, loop_index, masked_vertices)
+    '''
+    bpy.context.scene.update()
+    bpy.ops.object.mode_set(mode='EDIT')        
+  
+#----------------------------------------------------show normal tools----------------------------------------------------------
+def is_same_vector(v1,v2):
+    for i in range(0,len(v1)):
+        if v1[i]!=v2[i]:
+            return False
+
+    return True
+
+def get_view_quaternion():
+    for area in bpy.context.screen.areas:
+        if area.type == "VIEW_3D":
+            return area.spaces[0].region_3d.view_rotation
+
+def get_view_rotational_matrix(reverse=False):
+    qt = mathutils.Quaternion(bpy.context.scene.ne_view_orientation)
+    if reverse:
+        qt.conjugate()
+    return qt.to_matrix()
+
+def rot_vector(v, axis='X', reverse=False, angle=90):
+    angle = math.radians(-angle if reverse else angle)
+    mRot = mathutils.Matrix.Rotation(angle, 3, 'X')
+    return mRot * v
+
+def view_normal_callback(self, context):
+    scn = context.scene
+
+    #update from view
+    if scn.ne_update_by_global_callback:
+        scn.ne_update_by_global_callback = False
+        return
+
+    real_normal = scn.ne_view_normal
+    if scn.ne_view_sync_mode:
+        mView = get_view_rotational_matrix()
+        real_normal = mView * real_normal
+    else:
+        real_normal = rot_vector(real_normal)
     
-    return out
+    scn.ne_type_normal = real_normal
 
 def type_direction_callback(self, context):
     scn = context.scene
     v = mathutils.Vector(scn.ne_type_normal)
-    changed_index = get_changed_index(context)
     
-    #check 1 or -1
-    if len(changed_index)==1:
-        i = changed_index[0]
-        if v[i]==1 or v[i]==-1:
-            new = [0,0,0]
-            new[i] = v[i]
-            v = new
-        else:
-            v.normalize()
+    nv = copy.deepcopy(v)
+    nv.normalize()
+    rotated = nv
+
+    if scn.ne_view_sync_mode:
+        mView = get_view_rotational_matrix(True)
+        rotated = mView * nv
     else:
-        v.normalize()
-        
-    scn.ne_normal = v
-    scn.ne_old_type_normal = scn.ne_normal
+        rotated = rot_vector(nv, reverse=True)
+
+    if not is_same_vector(scn.ne_type_normal, scn.ne_type_normal_old):
+        if not scn.ne_update_by_global_callback:
+            set_normal_to_selected(context, nv)
+        scn.ne_type_normal_old = scn.ne_type_normal
+
+    #update direction sphere
+    # avoid recursive call
+    scn.ne_update_by_global_callback = True
+    scn.ne_view_normal = rotated
      
+def index_callback(self, context):
+    scn = context.scene
+    if scn.ne_split_mode:
+        o = context.active_object   
+        bm = bmesh.from_edit_mesh(o.data)
+        ensure_lookup_table(bm)  
+        index = bm.select_history.active.index
+        masked_vertices = get_masked_vertices(context)  
+
+        face_index = scn.ne_view_normal_index
+        to_faces = create_face_table(o.data)
+        if face_index < len(to_faces[index]):
+            o.data.calc_normals_split()
+            loop_index = to_faces[index][face_index]
+            rotated = o.data.loops[loop_index].normal
+            if scn.ne_view_sync_mode:
+                mView = get_view_rotational_matrix(True)
+                rotated = mView * rotated
+            else:
+                rotated = rot_vector(rotated, reverse=True)
+            scn.ne_view_normal = rotated
+
+def view_orientation_callback(self, context):
+    scn = context.scene
+    scn.ne_type_normal = scn.ne_type_normal
+
+def view_sync_toggle_callback(self, context):
+    scn = context.scene
+    scn.ne_type_normal = scn.ne_type_normal
+
 #------------------------------------------------------------------UI-------------------------------------------------------------------------
 class UI(bpy.types.Panel):
   bl_label = "Normal Edit"
   bl_space_type = "VIEW_3D"
   bl_region_type = "TOOLS"
+  bl_category = "Normal"
   
   #for cache
-  bpy.types.Scene.ne_normal_cache = bpy.props.FloatVectorProperty(name="",subtype='XYZ',min=-1,max=1)
+  bpy.types.Scene.ne_view_normal_cache = bpy.props.FloatVectorProperty(name="",subtype='XYZ',min=-1,max=1)
+  bpy.types.Scene.ne_last_selected_vert_index = bpy.props.IntProperty(default=-1)
+  bpy.types.Scene.ne_view_orientation = bpy.props.FloatVectorProperty(name="",default=(1,1,0,0),size=4,update=view_orientation_callback)
   
   #for show normals
+  bpy.types.Scene.ne_view_sync_mode = bpy.props.BoolProperty(name="View Sync Mode",default=True,update=view_sync_toggle_callback)
   bpy.types.Scene.ne_split_mode = bpy.props.BoolProperty(name="Split Mode",default=False)
-  bpy.types.Scene.ne_normal_index = bpy.props.IntProperty(name="index",default=0,min=0)
-  bpy.types.Scene.ne_normal = bpy.props.FloatVectorProperty(name="",default=(1,0,0),subtype='DIRECTION',update=direction_callback)
-  bpy.types.Scene.ne_type_normal = bpy.props.FloatVectorProperty(name="",subtype='XYZ',min=-1,max=1,update=type_direction_callback)
-  bpy.types.Scene.ne_old_type_normal = bpy.props.FloatVectorProperty(name="old")
+  bpy.types.Scene.ne_view_normal_index = bpy.props.IntProperty(name="index",default=0,min=0,update=index_callback)
+  bpy.types.Scene.ne_type_normal_old = bpy.props.FloatVectorProperty(name="",default=(1,0,0),subtype='DIRECTION')
+  bpy.types.Scene.ne_view_normal = bpy.props.FloatVectorProperty(name="",default=(1,0,0),subtype='DIRECTION',update=view_normal_callback)
+  bpy.types.Scene.ne_normal = bpy.props.FloatVectorProperty(name="",default=(1,0,0),subtype='DIRECTION')
+  bpy.types.Scene.ne_type_normal = bpy.props.FloatVectorProperty(name="",subtype='XYZ',update=type_direction_callback)
+  bpy.types.Scene.ne_update_by_global_callback = bpy.props.BoolProperty(name="Split Mode",default=True)
       
   #for mask color
   bpy.types.Scene.ne_mask_name = bpy.props.StringProperty(default="smooth_normal_mask")
@@ -227,96 +410,78 @@ class UI(bpy.types.Panel):
     layout = self.layout
     ob = context.object
     scn = context.scene
-    row = layout.row()
-    
-    #basic tools
-    layout.operator("smoothnormal.smoothnormals")
-    layout.operator("smoothnormal.lastnormal")
-    if context.scene.tool_settings.mesh_select_mode[2]:
-        layout.operator("smoothnormal.setfacenormal")
-    layout.operator("smoothnormal.revert")
+
+    #display
+    layout.label(text="Display:")
+    layout.prop(ob.data, "use_auto_smooth", text="Activate", toggle=True)
+    row = layout.row(align=True)
+    row.prop(ob.data,"show_normal_loop",text="",icon="LOOPSEL")
+    row.prop(scn.tool_settings, "normal_size", text="Size")
     layout.separator()
     
     #mask tools
-    layout.label(text="Mask Tool")
-    layout.prop(ob.data,"show_weight", text="Show Mask")
+    layout.label(text="Mask Tool:")
+    layout.prop(ob.data,"show_weight", text="Show Mask",toggle=True)
     layout.operator("smoothnormal.createmask")
     layout.operator("smoothnormal.clearmask")
 
     #show normal
-    '''
     layout.separator()
-    layout.label(text="Edit Normal")
+    layout.label(text="Edit Normal:")
     row = layout.row()
     row.prop(scn,"ne_split_mode",toggle=True) 
-    row.prop(scn,"ne_normal_index")
+    row.prop(scn,"ne_view_normal_index")
+    layout.prop(scn, "ne_view_sync_mode", toggle=True)
     row = layout.row()
     row.column().prop(scn,"ne_type_normal")
-    row.prop(scn,"ne_normal")
+    row.prop(scn,"ne_view_normal")
     layout.separator()
     row = layout.row(align=True)
     row.alignment = "EXPAND"
     row.operator("smoothnormal.copy",icon="COPYDOWN")
     row.operator("smoothnormal.paste",icon="PASTEDOWN")
-    '''
-    
-    
-    
+        
+    #basic tools
+    layout.separator()
+    row = layout.row(align=True)
+    row.operator("smoothnormal.smoothnormals")
+    row.operator("smoothnormal.revert")
+    if context.scene.tool_settings.mesh_select_mode[2]:
+        layout.operator("smoothnormal.setfacenormal")
+
+    #layout.operator("smoothnormal.rotate")
+
 #------------------------------------------------------------------Operator(Button)----------------------------------------------------
 class SmoothButton(bpy.types.Operator):
   bl_idname = "smoothnormal.smoothnormals"
-  bl_label = "smooth selected normal(s)"
+  bl_label = "Smooth"
   
   def execute(self, context):
     o = bpy.context.active_object
-    o.data.use_auto_smooth = True
     masked_vertices = get_masked_vertices(context)
     
     bpy.ops.object.mode_set(mode='OBJECT')
     smooth_selected_normals(o.data, masked_vertices)
     bpy.context.scene.update()
     bpy.ops.object.mode_set(mode='EDIT')
+    update_active_normal(context,o)
+    bpy.ops.object.mode_set(mode='EDIT')
 
     return{'FINISHED'}
-        
-class SetSameNormalLastButton(bpy.types.Operator):
-    bl_idname = "smoothnormal.lastnormal"
-    bl_label = "set last selected normal"
-    
-    def execute(self, context):
-        o = bpy.context.active_object
-        o.data.use_auto_smooth = True
-            
-        bm = bmesh.from_edit_mesh(o.data)
-        active = bm.select_history.active
-        if active:
-            ensure_lookup_table(bm)
-            normal = copy.deepcopy(active.normal)
-            index = active.index
-            masked_vertices = get_masked_vertices(context)
-            
-            bpy.ops.object.mode_set(mode='OBJECT')
-            if bpy.context.scene.tool_settings.mesh_select_mode[0]:
-                normal = get_vertex_normal(o.data, index)
-            
-            set_same_normal(o.data, normal, masked_vertices)
-            bpy.context.scene.update()
-            bpy.ops.object.mode_set(mode='EDIT')
-
-        return{'FINISHED'}
     
 class RevertButton(bpy.types.Operator):
     bl_idname = "smoothnormal.revert"
-    bl_label = "revert selected normal(s)"
+    bl_label = "Restore"
     
     def execute(self, context):
         o = bpy.context.active_object
-        o.data.use_auto_smooth = True
         masked_vertices = get_masked_vertices(context)
         
         bpy.ops.object.mode_set(mode='OBJECT')       
         revert_selected_normals(o.data, masked_vertices)
         bpy.context.scene.update()
+        bpy.ops.object.mode_set(mode='EDIT')
+        update_active_normal(context, o)
         bpy.ops.object.mode_set(mode='EDIT')
 
         return{'FINISHED'}
@@ -327,20 +492,20 @@ class SetFaceNormal(bpy.types.Operator):
     
     def execute(self, context):
         o = bpy.context.active_object
-        o.data.use_auto_smooth = True
         masked_vertices = get_masked_vertices(context)
         
         bpy.ops.object.mode_set(mode='OBJECT')
         set_face_normal(o.data, masked_vertices)
         bpy.context.scene.update()
         bpy.ops.object.mode_set(mode='EDIT')
+        #update_active_normal(context, o)
+        bpy.ops.object.mode_set(mode='EDIT')
         
         return {'FINISHED'}
-   
     
 class CreateMaskButton(bpy.types.Operator):
     bl_idname = "smoothnormal.createmask"
-    bl_label = "mask normal(s)"
+    bl_label = "mask vertex"
     
     def execute(self, context):
         o = context.active_object         
@@ -394,14 +559,11 @@ class CopyButton(bpy.types.Operator):
         o = bpy.context.active_object           
         bm = bmesh.from_edit_mesh(o.data)
         ensure_lookup_table(bm)
-        for f in bm.faces:
-            for v in f.verts:
-                v.normal = (1,0,0)
-                
-        if scn.ne_split_mode:
-            i=0
-        else:
-            j=0
+
+        normal = get_active_normal(context, o)
+        if normal!=None:
+            scn.ne_view_normal_cache = normal[0]
+            
         return {'FINISHED'}
     
 class PasteButton(bpy.types.Operator):
@@ -409,12 +571,48 @@ class PasteButton(bpy.types.Operator):
     bl_label = "Paste"
     
     def execute(self, context):
+        set_normal_to_selected(context, context.scene.ne_view_normal_cache)
+        bpy.context.scene.update()
+        bpy.ops.object.mode_set(mode='EDIT')
+        update_active_normal(context,context.active_object)
+        bpy.ops.object.mode_set(mode='EDIT')
+                    
         return {'FINISHED'}
     
+def is_normal_active(ob):
+    if not hasattr(ob,'mode'):
+        return False
+    return ob.mode == 'EDIT' and ob.data.use_auto_smooth and ob.data.show_normal_loop
+
+def global_callback_handler(context):
+    ob = bpy.context.active_object
+    scn = bpy.context.scene
+    if is_normal_active(ob):
+        #update view direction
+        new_orientation = get_view_quaternion()
+        if new_orientation==None:
+            return
+
+        if not is_same_vector(new_orientation, scn.ne_view_orientation):
+            #update view orientation
+            scn.ne_update_by_global_callback = True
+            scn.ne_view_orientation = new_orientation
+
+        #active vertex changed
+        bm = bmesh.from_edit_mesh(ob.data)
+        ensure_lookup_table(bm)  
+        active = bm.select_history.active
+        if active!=None:
+            index = active.index
+            if index != scn.ne_last_selected_vert_index:
+                scn.ne_last_selected_vert_index = index
+                scn.ne_update_by_global_callback = True
+                scn.ne_type_normal = get_active_normal(bpy.context, ob)[0]
 
 def register():
     bpy.utils.register_module(__name__)
-    
+    bpy.app.handlers.scene_update_post.append(global_callback_handler)
+
 def unregister():
     bpy.utils.unregister_module(__name__)
     
