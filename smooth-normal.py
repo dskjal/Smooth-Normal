@@ -558,7 +558,6 @@ def global_callback_handler(context):
     ob = bpy.context.active_object
     scn = bpy.context.scene
     if is_normal_active(ob):
-        #update view direction
         new_orientation = get_view_quaternion()
         if new_orientation==None:
             return
