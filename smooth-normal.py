@@ -176,8 +176,6 @@ def get_active_normal(context,ob):
             if loop_index < len(to_loops[index]):
                 loop_index = to_loops[index][loop_index]
                 normal = ob.data.loops[loop_index].normal
-            else:
-                normal = active.normal
         else:
             for f in to_loops[index]:
                 if ob.data.loops[f].vertex_index==index:
