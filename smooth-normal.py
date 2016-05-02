@@ -45,15 +45,15 @@ def get_loop_normals(data):
     data.calc_normals_split()
     return [l.normal for l in data.loops]
     
-def create_face_table(data):
-    to_faces = [[] for row in range(len(data.vertices))]
+def create_loop_table(data):
+    to_loops = [[] for row in range(len(data.vertices))]
         
     for p in data.polygons:
         for i in range( p.loop_start, p.loop_start + p.loop_total ):
             index = data.loops[i].vertex_index
-            to_faces[index].append(i)
+            to_loops[index].append(i)
             
-    return to_faces
+    return to_loops
 
 def get_masked_vertices(context):
     ob = context.active_object         
@@ -86,7 +86,7 @@ def smooth_selected_normals(data, masked_vertices):
     
     vnormals = get_vertex_normals(data)
    
-    to_faces = create_face_table(data)  
+    to_loops = create_loop_table(data)  
     
     #create edge table
     edges = [[] for row in range(len(data.vertices))]
@@ -103,30 +103,30 @@ def smooth_selected_normals(data, masked_vertices):
             cn += vnormals[e]
         
         cn.normalize()
-        for f in to_faces[v.index]:
+        for f in to_loops[v.index]:
             out_normals[f] = cn
         
     data.normals_split_custom_set(out_normals)
 
 def restore_selected_normals(data, masked_vertices):
     normals = get_loop_normals(data)
-    to_faces = create_face_table(data)
+    to_loops = create_loop_table(data)
     
     selected = [v for v in data.vertices if v.select and not masked_vertices[v.index] ]
     for s in selected:
-        for f in to_faces[s.index]:
+        for f in to_loops[s.index]:
             normals[f] = s.normal
             
     data.normals_split_custom_set(normals)
 
 def set_same_normal(data, normal, masked_vertices):
     normals = get_loop_normals(data)  
-    to_faces = create_face_table(data)
+    to_loops = create_loop_table(data)
         
     #update normals
     selected = [v for v in data.vertices if v.select and not masked_vertices[v.index] ]
     for v in selected:
-        for f in to_faces[v.index]:
+        for f in to_loops[v.index]:
             normals[f] = normal
         
     data.normals_split_custom_set(normals)
@@ -164,7 +164,7 @@ def get_active_normal(context,ob):
         return None
 
     index = active.index
-    to_faces = create_face_table(ob.data)
+    to_loops = create_loop_table(ob.data)
     loop_normals = get_loop_normals(ob.data)
     loop_index = -1
 
@@ -172,14 +172,14 @@ def get_active_normal(context,ob):
     if bpy.context.scene.tool_settings.mesh_select_mode[0]:
         #vertex
         if scn.ne_split_mode:
-            face_index = scn.ne_view_normal_index
-            if face_index < len(to_faces[index]):
-                loop_index = to_faces[index][face_index]
+            loop_index = scn.ne_view_normal_index
+            if loop_index < len(to_loops[index]):
+                loop_index = to_loops[index][loop_index]
                 normal = ob.data.loops[loop_index].normal
             else:
                 normal = active.normal
         else:
-            for f in to_faces[index]:
+            for f in to_loops[index]:
                 if ob.data.loops[f].vertex_index==index:
                     normal = ob.data.loops[f].normal
                     loop_index = ob.data.loops[f].index
@@ -222,10 +222,10 @@ def set_normal_to_selected(context, normal):
     if scn.ne_split_mode:
         if scn.tool_settings.mesh_select_mode[0]:
             #split vertex mode
-            face_index = scn.ne_view_normal_index
-            to_faces = create_face_table(o.data)
-            if face_index < len(to_faces[index]):
-                loop_index = to_faces[index][face_index]                                
+            loop_index = scn.ne_view_normal_index
+            to_loops = create_loop_table(o.data)
+            if loop_index < len(to_loops[index]):
+                loop_index = to_loops[index][loop_index]                                
                 set_loop_normal(o.data, normal, [loop_index], masked_vertices)
         if scn.tool_settings.mesh_select_mode[2]:
             #split face mode
@@ -322,11 +322,11 @@ def index_callback(self, context):
         index = bm.select_history.active.index
         masked_vertices = get_masked_vertices(context)  
 
-        face_index = scn.ne_view_normal_index
-        to_faces = create_face_table(o.data)
-        if face_index < len(to_faces[index]):
+        loop_index = scn.ne_view_normal_index
+        to_loops = create_loop_table(o.data)
+        if loop_index < len(to_loops[index]):
             o.data.calc_normals_split()
-            loop_index = to_faces[index][face_index]
+            loop_index = to_loops[index][face_index]
             rotated = o.data.loops[loop_index].normal
             if scn.ne_view_sync_mode:
                 mView = get_view_rotational_matrix(True)
