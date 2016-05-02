@@ -529,8 +529,6 @@ class CopyButton(bpy.types.Operator):
     def execute(self, context):
         scn = context.scene
         o = bpy.context.active_object           
-        bm = bmesh.from_edit_mesh(o.data)
-        ensure_lookup_table(bm)
 
         normal = get_active_normal(context, o)
         if normal!=None:
