@@ -168,7 +168,7 @@ def get_active_normal(context,ob):
     loop_normals = get_loop_normals(ob.data)
     loop_index = -1
 
-    normal = None
+    normal = active.normal
     if bpy.context.scene.tool_settings.mesh_select_mode[0]:
         #vertex
         if scn.ne_split_mode:
@@ -184,9 +184,6 @@ def get_active_normal(context,ob):
                     normal = ob.data.loops[f].normal
                     loop_index = ob.data.loops[f].index
                     break
-    elif bpy.context.scene.tool_settings.mesh_select_mode[2]:
-        #face
-        normal = active.normal
         
     return [normal, index, loop_index]
 
