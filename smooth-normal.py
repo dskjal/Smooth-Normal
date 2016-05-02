@@ -8,7 +8,7 @@ from bpy.props import *
 bl_info = {
     "name" : "Normal Smooth Tool",             
     "author" : "dskjal",                  
-    "version" : (4,1),                  
+    "version" : (4,2),                  
     "blender" : (2, 7, 7),              
     "location" : "",   
     "description" : "Edit Custom Normal(s)",   
@@ -17,8 +17,6 @@ bl_info = {
     "tracker_url" : "",                 
     "category" : "Mesh"                   
 }
-#-----------------------------------------------------------debug tools--------------
-
 #----------------------------------------------------------helper tools-----------------------------------------------------
 def get_vertex_normal(data, index):
     normal = data.vertices[index].normal
@@ -45,16 +43,10 @@ def get_vertex_normals(data):
 
 def get_loop_normals(data):
     data.calc_normals_split()
-    normals = []
-    for l in data.loops:
-        normals.append(l.normal)
-     
-    return normals
+    return [l.normal for l in data.loops]
     
 def create_face_table(data):
-    to_faces = []
-    for i in range(0, len(data.vertices)):
-        to_faces.append([])
+    to_faces = [[] for row in range(len(data.vertices))]
         
     for p in data.polygons:
         for i in range( p.loop_start, p.loop_start + p.loop_total ):
@@ -97,9 +89,7 @@ def smooth_selected_normals(data, masked_vertices):
     to_faces = create_face_table(data)  
     
     #create edge table
-    edges = []
-    for i in range(0,len(data.vertices)):
-        edges.append([])
+    edges = [[] for row in range(len(data.vertices))]
     for e in data.edges:
         vs = e.vertices
         edges[vs[0]].append(vs[1])
@@ -118,9 +108,8 @@ def smooth_selected_normals(data, masked_vertices):
         
     data.normals_split_custom_set(out_normals)
 
-def revert_selected_normals(data, masked_vertices):
+def restore_selected_normals(data, masked_vertices):
     normals = get_loop_normals(data)
-            
     to_faces = create_face_table(data)
     
     selected = [v for v in data.vertices if v.select and not masked_vertices[v.index] ]
@@ -144,23 +133,22 @@ def set_same_normal(data, normal, masked_vertices):
    
 def set_loop_normal(data, normal, loop_index, masked_vertices):
     normals = get_loop_normals(data)  
-    to_faces = create_face_table(data)
         
     #update normals
-    for l in loop_index:
-        if not masked_vertices[ data.loops[l].vertex_index ]:
-            normals[l] = normal
+    selected = [l for l in loop_index if not masked_vertices[ data.loops[l].vertex_index ]]
+    for s in selected:
+        normals[s] = normal
 
     data.normals_split_custom_set(normals)
 
 def set_face_normal(data, masked_vertices):
     normals = get_loop_normals(data)
-    for p in data.polygons:
-        if p.select:
-            normal = p.normal
-            for i in range( p.loop_start, p.loop_start + p.loop_total ):
-                if not masked_vertices[data.loops[i].vertex_index]:
-                    normals[i] = normal    
+
+    selected = [p for p in data.polygons if p.select]
+    for s in selected:
+        for i in range( s.loop_start, s.loop_start + s.loop_total ):
+            if not masked_vertices[data.loops[i].vertex_index]:
+                normals[i] = s.normal      
     
     data.normals_split_custom_set(normals)  
 
@@ -202,7 +190,6 @@ def get_active_normal(context,ob):
         
     return [normal, index, loop_index]
 
-#run in edit mode
 def update_active_normal(context, ob):
     scn = context.scene
     normal = get_active_normal(context, ob)
@@ -220,15 +207,6 @@ def update_active_normal(context, ob):
 
     scn.ne_type_normal = normal
 
-def is_vertices_selected_bm(bm):
-    count = 0
-    for v in bm.verts:
-        if v.select:
-            count += 1
-            if count>1:
-                return True
-    return False
-
 def set_normal_to_selected(context, normal):
     scn = context.scene
     o = context.active_object   
@@ -237,7 +215,6 @@ def set_normal_to_selected(context, normal):
     if not hasattr(bm.select_history.active,'index'):
         return
     index = bm.select_history.active.index
-    is_multi_paste = is_vertices_selected_bm(bm)
     masked_vertices = get_masked_vertices(context)  
 
     bpy.ops.object.mode_set(mode='OBJECT')
@@ -261,26 +238,13 @@ def set_normal_to_selected(context, normal):
     else:
         set_same_normal(o.data, normal, masked_vertices)
 
-    '''
-    if is_multi_paste or not scn.ne_split_mode:
-        set_same_normal(o.data, normal, masked_vertices)
-    elif scn.ne_split_mode and scn.tool_settings.mesh_select_mode[2]:
-        # split mode and face is selected
-        i=0
-    else:
-        face_index = scn.ne_view_normal_index
-        to_faces = create_face_table(o.data)
-        if face_index < len(to_faces[index]):
-            loop_index = to_faces[index][face_index]                                
-            set_loop_normal(o.data, normal, loop_index, masked_vertices)
-    '''
     bpy.context.scene.update()
     bpy.ops.object.mode_set(mode='EDIT')        
   
 #----------------------------------------------------show normal tools----------------------------------------------------------
 def is_same_vector(v1,v2):
-    for i in range(0,len(v1)):
-        if v1[i]!=v2[i]:
+    for e1,e2 in zip(v1,v2):
+        if e1!=e2:
             return False
 
     return True
@@ -298,7 +262,6 @@ def get_view_rotational_matrix(reverse=False):
     return qt.to_matrix()
 
 def get_object_rotational_matrix():
-    #object rotation
     return mathutils.Matrix(bpy.context.active_object.matrix_world).to_quaternion().to_matrix()
 
 def rot_vector(v, axis='X', reverse=False, angle=90):
@@ -345,7 +308,7 @@ def type_direction_callback(self, context):
             set_normal_to_selected(context, nv)
         scn.ne_type_normal_old = scn.ne_type_normal
 
-    #update direction sphere
+    # update direction sphere
     # avoid recursive call
     scn.ne_update_by_global_callback = True
     scn.ne_view_normal = rotated
@@ -487,7 +450,7 @@ class RevertButton(bpy.types.Operator):
         masked_vertices = get_masked_vertices(context)
         
         bpy.ops.object.mode_set(mode='OBJECT')       
-        revert_selected_normals(o.data, masked_vertices)
+        restore_selected_normals(o.data, masked_vertices)
         bpy.context.scene.update()
         bpy.ops.object.mode_set(mode='EDIT')
         update_active_normal(context, o)
