@@ -27,7 +27,7 @@ bl_info = {
     "name" : "Normal Smooth Tool",             
     "author" : "dskjal",                  
     "version" : (4,2),                  
-    "blender" : (2, 77, 0),              
+    "blender" : (2, 79, 0),              
     "location" : "View3D > Toolshelf > Normal",   
     "description" : "Edit Custom Normal(s)",   
     "warning" : "",
@@ -591,12 +591,24 @@ def global_callback_handler(context):
                 scn.ne_update_by_global_callback = True
                 scn.ne_type_normal = get_active_normal(bpy.context, ob)[0]
 
+classes = (
+    UI,
+    SmoothButton,
+    RevertButton,
+    SetFaceNormal,
+    CreateMaskButton,
+    ClearMaskButton,
+    CopyButton,
+    PasteButton
+)
 def register():
-    bpy.utils.register_module(__name__)
+    for cls in classes:
+        bpy.utils.register_class(cls)
     bpy.app.handlers.scene_update_post.append(global_callback_handler)
 
 def unregister():
-    bpy.utils.unregister_module(__name__)
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)
     
 if __name__ == "__main__":
     register()
