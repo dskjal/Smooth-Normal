@@ -364,26 +364,6 @@ class UI(bpy.types.Panel):
   bl_region_type = "TOOLS"
   bl_category = "Normal"
   
-  #for cache
-  bpy.types.Scene.ne_view_normal_cache = bpy.props.FloatVectorProperty(name="",subtype='XYZ',min=-1,max=1)
-  bpy.types.Scene.ne_last_selected_vert_index = bpy.props.IntProperty(default=-1)
-  bpy.types.Scene.ne_view_orientation = bpy.props.FloatVectorProperty(name="",default=(1,1,0,0),size=4,update=view_orientation_callback)
-  
-  #for show normals
-  bpy.types.Scene.ne_view_sync_mode = bpy.props.BoolProperty(name="View Sync Mode",default=True,update=view_sync_toggle_callback)
-  bpy.types.Scene.ne_split_mode = bpy.props.BoolProperty(name="Split Mode",default=False)
-  bpy.types.Scene.ne_view_normal_index = bpy.props.IntProperty(name="index",default=0,min=0,update=index_callback)
-  bpy.types.Scene.ne_type_normal_old = bpy.props.FloatVectorProperty(name="",default=(1,0,0),subtype='DIRECTION')
-  bpy.types.Scene.ne_view_normal = bpy.props.FloatVectorProperty(name="",default=(1,0,0),subtype='DIRECTION',update=view_normal_callback)
-  bpy.types.Scene.ne_normal = bpy.props.FloatVectorProperty(name="",default=(1,0,0),subtype='DIRECTION')
-  bpy.types.Scene.ne_type_normal = bpy.props.FloatVectorProperty(name="",subtype='XYZ',update=type_direction_callback)
-  bpy.types.Scene.ne_update_by_global_callback = bpy.props.BoolProperty(name="Split Mode",default=True)
-      
-  #for mask color
-  bpy.types.Scene.ne_mask_name = bpy.props.StringProperty(default="smooth_normal_mask")
-  bpy.types.Scene.ne_vertex_color = bpy.props.FloatVectorProperty(name="",default=(1,0,0),subtype='COLOR_GAMMA')
-  bpy.types.Scene.ne_clear_color = bpy.props.FloatVectorProperty(name="",default=(1,1,1),subtype='COLOR_GAMMA')
-  
   @classmethod
   def poll(self,context):
     ob = context.active_object
@@ -602,13 +582,52 @@ classes = (
     PasteButton
 )
 def register():
+    #for cache
+    bpy.types.Scene.ne_view_normal_cache = bpy.props.FloatVectorProperty(name="",subtype='XYZ',min=-1,max=1)
+    bpy.types.Scene.ne_last_selected_vert_index = bpy.props.IntProperty(default=-1)
+    bpy.types.Scene.ne_view_orientation = bpy.props.FloatVectorProperty(name="",default=(1,1,0,0),size=4,update=view_orientation_callback)
+
+    #for show normals
+    bpy.types.Scene.ne_view_sync_mode = bpy.props.BoolProperty(name="View Sync Mode",default=True,update=view_sync_toggle_callback)
+    bpy.types.Scene.ne_split_mode = bpy.props.BoolProperty(name="Split Mode",default=False)
+    bpy.types.Scene.ne_view_normal_index = bpy.props.IntProperty(name="index",default=0,min=0,update=index_callback)
+    bpy.types.Scene.ne_type_normal_old = bpy.props.FloatVectorProperty(name="",default=(1,0,0),subtype='DIRECTION')
+    bpy.types.Scene.ne_view_normal = bpy.props.FloatVectorProperty(name="",default=(1,0,0),subtype='DIRECTION',update=view_normal_callback)
+    bpy.types.Scene.ne_normal = bpy.props.FloatVectorProperty(name="",default=(1,0,0),subtype='DIRECTION')
+    bpy.types.Scene.ne_type_normal = bpy.props.FloatVectorProperty(name="",subtype='XYZ',update=type_direction_callback)
+    bpy.types.Scene.ne_update_by_global_callback = bpy.props.BoolProperty(name="Split Mode",default=True)
+        
+    #for mask color
+    bpy.types.Scene.ne_mask_name = bpy.props.StringProperty(default="smooth_normal_mask")
+    bpy.types.Scene.ne_vertex_color = bpy.props.FloatVectorProperty(name="",default=(1,0,0),subtype='COLOR_GAMMA')
+    bpy.types.Scene.ne_clear_color = bpy.props.FloatVectorProperty(name="",default=(1,1,1),subtype='COLOR_GAMMA')
+    
     for cls in classes:
         bpy.utils.register_class(cls)
     bpy.app.handlers.scene_update_post.append(global_callback_handler)
 
 def unregister():
+    bpy.app.handlers.scene_update_post.remove(global_callback_handler)
+
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
+
+    del bpy.types.Scene.ne_view_normal_cache
+    del bpy.types.Scene.ne_last_selected_vert_index
+    del bpy.types.Scene.ne_view_orientation
+  
+    del bpy.types.Scene.ne_view_sync_mode
+    del bpy.types.Scene.ne_split_mode
+    del bpy.types.Scene.ne_view_normal_index
+    del bpy.types.Scene.ne_type_normal_old
+    del bpy.types.Scene.ne_view_normal
+    del bpy.types.Scene.ne_normal
+    del bpy.types.Scene.ne_type_normal
+    del bpy.types.Scene.ne_update_by_global_callback
+      
+    del bpy.types.Scene.ne_mask_name
+    del bpy.types.Scene.ne_vertex_color
+    del bpy.types.Scene.ne_clear_color
     
 if __name__ == "__main__":
     register()
