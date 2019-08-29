@@ -259,11 +259,6 @@ def window_matrix_handler():
     except:
         bpy.context.scene.dskjal_sn_props.ne_window_rotation = (0,0,0,0)
 
-def get_window_rotation():
-    if bpy.context.scene.dskjal_sn_props.ne_window_rotation != (0,0,0,0):
-        return bpy.context.scene.dskjal_sn_props.ne_window_rotation
-    return None
-
 def get_view_rotational_matrix(reverse=False):
     qt = mathutils.Quaternion(bpy.context.scene.dskjal_sn_props.ne_window_rotation)
     if reverse:
@@ -490,7 +485,14 @@ def is_normal_active(ob):
         return False
     return bpy.context.scene.dskjal_sn_props.ne_view_sync_mode
 
+def get_window_rotation():
+    if bpy.context.scene.dskjal_sn_props.ne_window_rotation != (0,0,0,0):
+        return bpy.context.scene.dskjal_sn_props.ne_window_rotation
+    return None
+
+
 def global_callback_handler():
+    print('global_calback_handler')
     interval = 1.0
     ob = bpy.context.view_layer.objects.active
     scn = bpy.context.scene.dskjal_sn_props
@@ -501,7 +503,6 @@ def global_callback_handler():
 
         if not is_same_vector(new_rotation, scn.ne_window_rotation):
             #update view orientation
-            print('update view orientation')
             scn.ne_update_by_global_callback = True
             scn.ne_view_orientation = new_rotation
             scn.ne_window_rotation = new_rotation
@@ -546,23 +547,24 @@ classes = (
     DSKJAL_OT_PasteButton,
     DSKJAL_SN_Props
 )
+draw_handle = None
 def register():
-    
     for cls in classes:
         bpy.utils.register_class(cls)
 
     bpy.types.Scene.dskjal_sn_props = bpy.props.PointerProperty(type=DSKJAL_SN_Props)
-    bpy.app.timers.register(global_callback_handler)
-    bpy.types.SpaceView3D.draw_handler_add(window_matrix_handler, (), 'WINDOW', 'POST_PIXEL')
+    bpy.app.timers.register(global_callback_handler, persistent=True)
+    draw_handle = bpy.types.SpaceView3D.draw_handler_add(window_matrix_handler, (), 'WINDOW', 'POST_PIXEL')
 
 def unregister():
+    if draw_handle != None:
+        bpy.types.SpaceView3D.draw_handler_remove(draw_handle, 'WINDOW')
     bpy.app.timers.unregister(global_callback_handler)
-    bpy.types.SpaceView3D.draw_handler_remove(window_matrix_handler, (), 'WINDOW', 'POST_PIXEL')
+    if hasattr(bpy.types.Scene, "dskjal_sn_props"): del bpy.types.Scene.dskjal_sn_props
 
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
 
-    if hasattr(bpy.types.Scene, "dskjal_sn_props"): del bpy.types.Scene.dskjal_sn_props
     
 if __name__ == "__main__":
     register()
