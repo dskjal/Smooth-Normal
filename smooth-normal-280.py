@@ -492,7 +492,6 @@ def get_window_rotation():
 
 
 def global_callback_handler():
-    print('global_calback_handler')
     interval = 1.0
     ob = bpy.context.view_layer.objects.active
     scn = bpy.context.scene.dskjal_sn_props
