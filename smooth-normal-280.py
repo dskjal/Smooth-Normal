@@ -28,7 +28,7 @@ bl_info = {
     "author" : "dskjal",                  
     "version" : (4,2),                  
     "blender" : (2, 80, 0),              
-    "location" : "View3D > Toolshelf > Normal",   
+    "location" : "View3D > Side Bar > Normal",   
     "description" : "Edit Custom Normal(s)",   
     "warning" : "",
     "wiki_url" : "https://github.com/dskjal/Smooth-Normal",                    
