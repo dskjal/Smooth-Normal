@@ -492,7 +492,7 @@ def get_window_rotation():
 
 
 def global_callback_handler():
-    interval = 1.0
+    interval = 0.5
     ob = bpy.context.view_layer.objects.active
     scn = bpy.context.scene.dskjal_sn_props
     if is_normal_active(ob):
@@ -500,7 +500,7 @@ def global_callback_handler():
         if new_rotation == None:
             return interval
 
-        if not is_same_vector(new_rotation, scn.ne_window_rotation):
+        if not is_same_vector(new_rotation, scn.ne_view_orientation):
             #update view orientation
             scn.ne_update_by_global_callback = True
             scn.ne_view_orientation = new_rotation
