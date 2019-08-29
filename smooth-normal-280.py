@@ -26,7 +26,7 @@ from bpy.props import *
 bl_info = {
     "name" : "Normal Smooth Tool",             
     "author" : "dskjal",                  
-    "version" : (4,2),                  
+    "version" : (4,3),                  
     "blender" : (2, 80, 0),              
     "location" : "View3D > Side Bar > Normal",   
     "description" : "Edit Custom Normal(s)",   
@@ -80,20 +80,8 @@ def create_loop_table(data):
 def get_masked_vertices(context):
     ob = context.active_object         
     scn = context.scene.dskjal_sn_props
-    vertex_color = scn.ne_vertex_color
 
-    selected = [False]*len(ob.data.vertices)  
-    if not scn.ne_mask_name in ob.vertex_groups:
-        return selected
-
-    vg_index = ob.vertex_groups[scn.ne_mask_name].index
-    
-    for v in ob.data.vertices:
-        for vg in v.groups:
-            if vg.group == vg_index:
-                selected[v.index] = True
-                      
-    return selected
+    return [False]*len(ob.data.vertices)  
 
 def ensure_lookup_table(bm):
     bm.verts.ensure_lookup_table()
@@ -271,13 +259,13 @@ def window_matrix_handler():
     except:
         bpy.context.scene.dskjal_sn_props.ne_window_rotation = (0,0,0,0)
 
-def get_view_quaternion():
+def get_window_rotation():
     if bpy.context.scene.dskjal_sn_props.ne_window_rotation != (0,0,0,0):
         return bpy.context.scene.dskjal_sn_props.ne_window_rotation
     return None
 
 def get_view_rotational_matrix(reverse=False):
-    qt = mathutils.Quaternion(bpy.context.scene.dskjal_sn_props.ne_view_orientation)
+    qt = mathutils.Quaternion(bpy.context.scene.dskjal_sn_props.ne_window_rotation)
     if reverse:
         qt.conjugate()
 
@@ -466,54 +454,7 @@ class DSKJAL_OT_SetFaceNormal(bpy.types.Operator):
         update_scene()
         bpy.ops.object.mode_set(mode='EDIT')
         #update_active_normal(context, o)
-        bpy.ops.object.mode_set(mode='EDIT')
-        
-        return {'FINISHED'}
-    
-class DSKJAL_OT_CreateMaskButton(bpy.types.Operator):
-    bl_idname = "smoothnormal.createmask"
-    bl_label = "mask vertex"
-    
-    def execute(self, context):
-        o = context.active_object         
-        scn = context.scene.dskjal_sn_props
-
-        bpy.ops.object.mode_set(mode='OBJECT')
-        
-        #create vertex group if not have
-        if not scn.ne_mask_name in o.vertex_groups:
-            o.vertex_groups.new(scn.ne_mask_name)
-        vg = o.vertex_groups[scn.ne_mask_name]
-        
-        #update vertex group
-        selected = [v.index for v in o.data.vertices if v.select]
-        vg.add(selected, 1.0, 'REPLACE')
-
-        bpy.ops.object.mode_set(mode='EDIT')
-        
-        return {'FINISHED'}
-
-class DSKJAL_OT_ClearMaskButton(bpy.types.Operator):
-    bl_idname = "smoothnormal.clearmask"
-    bl_label = "clear selected mask"
-    
-    def execute(self, context):
-        o = context.active_object         
-        scn = context.scene.dskjal_sn_props
-
-        bpy.ops.object.mode_set(mode='OBJECT')
-        
-        if not scn.ne_mask_name in o.vertex_groups:
-            bpy.ops.object.mode_set(mode='EDIT')
-            return {'FINISHED'}
-        
-        vg = o.vertex_groups[scn.ne_mask_name]
-        
-        #update vertex group
-        selected = [v.index for v in o.data.vertices if v.select]
-        vg.remove(selected)
-
-        bpy.ops.object.mode_set(mode='EDIT')
+        #bpy.ops.object.mode_set(mode='EDIT')
         
         return {'FINISHED'}
     
@@ -554,14 +495,16 @@ def global_callback_handler():
     ob = bpy.context.view_layer.objects.active
     scn = bpy.context.scene.dskjal_sn_props
     if is_normal_active(ob):
-        new_orientation = get_view_quaternion()
-        if new_orientation == None:
+        new_rotation = get_window_rotation()
+        if new_rotation == None:
             return interval
 
-        if not is_same_vector(new_orientation, scn.ne_view_orientation):
+        if not is_same_vector(new_rotation, scn.ne_window_rotation):
             #update view orientation
+            print('update view orientation')
             scn.ne_update_by_global_callback = True
-            scn.ne_view_orientation = new_orientation
+            scn.ne_view_orientation = new_rotation
+            scn.ne_window_rotation = new_rotation
 
         #active vertex changed
         bm = bmesh.from_edit_mesh(ob.data)
@@ -594,18 +537,11 @@ class DSKJAL_SN_Props(bpy.types.PropertyGroup):
     ne_type_normal : bpy.props.FloatVectorProperty(name="",subtype='XYZ',update=type_direction_callback)
     ne_update_by_global_callback : bpy.props.BoolProperty(name="Split Mode",default=True)
         
-    #for mask color
-    ne_mask_name : bpy.props.StringProperty(default="smooth_normal_mask")
-    ne_vertex_color : bpy.props.FloatVectorProperty(name="",default=(1,0,0),subtype='COLOR_GAMMA')
-    ne_clear_color : bpy.props.FloatVectorProperty(name="",default=(1,1,1),subtype='COLOR_GAMMA')
-
 classes = (
     DSKJAL_PT_UI,
     DSKJAL_OT_SmoothButton,
     DSKJAL_OT_RevertButton,
     DSKJAL_OT_SetFaceNormal,
-    DSKJAL_OT_CreateMaskButton,
-    DSKJAL_OT_ClearMaskButton,
     DSKJAL_OT_CopyButton,
     DSKJAL_OT_PasteButton,
     DSKJAL_SN_Props
