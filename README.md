@@ -1,4 +1,9 @@
 # Smooth-Normal
+[Download for version 2.79](https://raw.githubusercontent.com/dskjal/Smooth-Normal/master/smooth-normal.py)  
+
+[Download for version 2.80](https://github.com/dskjal/Smooth-Normal/blob/master/smooth-normal-280.py)  
+
+
 This is the Blender addon that edit normal.  
 これは法線を編集する Blender のアドオンです．
 
