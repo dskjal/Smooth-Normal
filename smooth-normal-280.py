@@ -89,7 +89,7 @@ def ensure_lookup_table(bm):
     bm.faces.ensure_lookup_table()
     
 #---------------------------------------------------------------function body----------------------------------------------------------------------
-def smooth_selected_normals(data, masked_vertices):
+def smooth_selected_normals(data):
     normals = get_loop_normals(data)
     out_normals = copy.deepcopy(normals)  
     vnormals = get_vertex_normals(data)
@@ -103,7 +103,7 @@ def smooth_selected_normals(data, masked_vertices):
         edges[vs[1]].append(vs[0])
         
     #smooth normals
-    selected = [v for v in data.vertices if v.select and not masked_vertices[v.index] ]
+    selected = [v for v in data.vertices if v.select]
     for v in selected:
         cn = mathutils.Vector(vnormals[v.index])
         for e in edges[v.index]:
@@ -408,10 +408,9 @@ class DSKJAL_OT_SmoothButton(bpy.types.Operator):
   
   def execute(self, context):
     o = bpy.context.view_layer.objects.active
-    masked_vertices = get_masked_vertices(context)
     
     bpy.ops.object.mode_set(mode='OBJECT')
-    smooth_selected_normals(o.data, masked_vertices)
+    smooth_selected_normals(o.data)
     update_scene()
     bpy.ops.object.mode_set(mode='EDIT')
     update_active_normal(context,o)
