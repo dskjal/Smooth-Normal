@@ -77,12 +77,6 @@ def create_loop_table(data):
             
     return to_loops
 
-def get_masked_vertices(context):
-    ob = context.active_object         
-    scn = context.scene.dskjal_sn_props
-
-    return [False]*len(ob.data.vertices)  
-
 def ensure_lookup_table(bm):
     bm.verts.ensure_lookup_table()
     bm.edges.ensure_lookup_table()
@@ -95,7 +89,7 @@ def smooth_selected_normals(data):
     vnormals = get_vertex_normals(data)
     to_loops = create_loop_table(data)  
     
-    #create edge table
+    #create edge table for get active normal
     edges = [[] for row in range(len(data.vertices))]
     for e in data.edges:
         vs = e.vertices
@@ -108,6 +102,7 @@ def smooth_selected_normals(data):
         cn = mathutils.Vector(vnormals[v.index])
         for e in edges[v.index]:
             cn += vnormals[e]
+            print(vnormals[e])
         
         cn.normalize()
         for f in to_loops[v.index]:
@@ -115,47 +110,46 @@ def smooth_selected_normals(data):
         
     data.normals_split_custom_set(out_normals)
 
-def restore_selected_normals(data, masked_vertices):
+def restore_selected_normals(data):
     normals = get_loop_normals(data)
     to_loops = create_loop_table(data)
     
-    selected = [v for v in data.vertices if v.select and not masked_vertices[v.index] ]
+    selected = [v for v in data.vertices if v.select]
     for s in selected:
         for f in to_loops[s.index]:
             normals[f] = s.normal
             
     data.normals_split_custom_set(normals)
 
-def set_same_normal(data, normal, masked_vertices):
+def set_same_normal(data, normal):
     normals = get_loop_normals(data)  
     to_loops = create_loop_table(data)
         
     #update normals
-    selected = [v for v in data.vertices if v.select and not masked_vertices[v.index] ]
+    selected = [v for v in data.vertices if v.select]
     for v in selected:
         for f in to_loops[v.index]:
             normals[f] = normal
         
     data.normals_split_custom_set(normals)
    
-def set_loop_normal(data, normal, loop_index, masked_vertices):
+def set_loop_normal(data, normal, loop_index):
     normals = get_loop_normals(data)  
         
     #update normals
-    selected = [l for l in loop_index if not masked_vertices[ data.loops[l].vertex_index ]]
+    selected = [l for l in loop_index]
     for s in selected:
         normals[s] = normal
 
     data.normals_split_custom_set(normals)
 
-def set_face_normal(data, masked_vertices):
+def set_face_normal(data):
     normals = get_loop_normals(data)
 
     selected = [p for p in data.polygons if p.select]
     for s in selected:
         for i in range( s.loop_start, s.loop_start + s.loop_total ):
-            if not masked_vertices[data.loops[i].vertex_index]:
-                normals[i] = s.normal      
+            normals[i] = s.normal      
     
     data.normals_split_custom_set(normals)  
 
@@ -217,7 +211,6 @@ def set_normal_to_selected(context, normal):
     if not hasattr(bm.select_history.active,'index'):
         return
     index = bm.select_history.active.index
-    masked_vertices = get_masked_vertices(context)  
 
     bpy.ops.object.mode_set(mode='OBJECT')
 
@@ -228,7 +221,7 @@ def set_normal_to_selected(context, normal):
             to_loops = create_loop_table(o.data)
             if loop_index < len(to_loops[index]):
                 loop_index = to_loops[index][loop_index]                                
-                set_loop_normal(o.data, normal, [loop_index], masked_vertices)
+                set_loop_normal(o.data, normal, [loop_index])
         if bpy.context.scene.tool_settings.mesh_select_mode[2]:
             #split face mode
             selected = [p for p in o.data.polygons if p.select]
@@ -236,9 +229,9 @@ def set_normal_to_selected(context, normal):
             for s in selected:
                 for i in range( s.loop_start, s.loop_start + s.loop_total ):
                     loop_index.append(i)  
-            set_loop_normal(o.data, normal, loop_index, masked_vertices)
+            set_loop_normal(o.data, normal, loop_index)
     else:
-        set_same_normal(o.data, normal, masked_vertices)
+        set_same_normal(o.data, normal)
 
     update_scene()
     bpy.ops.object.mode_set(mode='EDIT')        
@@ -325,7 +318,6 @@ def index_callback(self, context):
         bm = bmesh.from_edit_mesh(o.data)
         ensure_lookup_table(bm)  
         index = bm.select_history.active.index
-        masked_vertices = get_masked_vertices(context)  
 
         loop_index = scn.ne_view_normal_index
         to_loops = create_loop_table(o.data)
@@ -424,10 +416,9 @@ class DSKJAL_OT_RevertButton(bpy.types.Operator):
     
     def execute(self, context):
         o = bpy.context.view_layer.objects.active
-        masked_vertices = get_masked_vertices(context)
         
         bpy.ops.object.mode_set(mode='OBJECT')       
-        restore_selected_normals(o.data, masked_vertices)
+        restore_selected_normals(o.data)
         update_scene()
         bpy.ops.object.mode_set(mode='EDIT')
         update_active_normal(context, o)
@@ -441,10 +432,9 @@ class DSKJAL_OT_SetFaceNormal(bpy.types.Operator):
     
     def execute(self, context):
         o = bpy.context.view_layer.objects.active
-        masked_vertices = get_masked_vertices(context)
         
         bpy.ops.object.mode_set(mode='OBJECT')
-        set_face_normal(o.data, masked_vertices)
+        set_face_normal(o.data)
         update_scene()
         bpy.ops.object.mode_set(mode='EDIT')
         #update_active_normal(context, o)
