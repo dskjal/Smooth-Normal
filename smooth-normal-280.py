@@ -428,7 +428,7 @@ class DSKJAL_OT_RevertButton(bpy.types.Operator):
     
 class DSKJAL_OT_SetFaceNormal(bpy.types.Operator):
     bl_idname = "smoothnormal.setfacenormal"
-    bl_label = "set face normal"
+    bl_label = "Set Face Normal"
     
     def execute(self, context):
         o = bpy.context.view_layer.objects.active
