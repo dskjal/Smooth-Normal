@@ -26,7 +26,7 @@ from bpy.props import *
 bl_info = {
     "name" : "Normal Smooth Tool",             
     "author" : "dskjal",                  
-    "version" : (4,3),                  
+    "version" : (4,4),                  
     "blender" : (2, 80, 0),              
     "location" : "View3D > Side Bar > Normal",   
     "description" : "Edit Custom Normal(s)",   
@@ -37,9 +37,8 @@ bl_info = {
 }
 #----------------------------------------------------------helper tools-----------------------------------------------------
 def update_scene():
-    #bpy.context.scene.update()
-    pass
-    
+    bpy.context.evaluated_depsgraph_get().update()
+
 def get_vertex_normal(data, index):
     normal = data.vertices[index].normal
     if data.has_custom_normals:
@@ -77,11 +76,17 @@ def create_loop_table(data):
             
     return to_loops
 
-def ensure_lookup_table(bm):
+# return None if can not get
+# else return (index, normal)
+def get_active_vertex(object):
+    bm = bmesh.from_edit_mesh(object.data)
     bm.verts.ensure_lookup_table()
     bm.edges.ensure_lookup_table()
     bm.faces.ensure_lookup_table()
-    
+    if not hasattr(bm.select_history.active,'index'):
+        return None
+    return (bm.select_history.active.index, bm.select_history.active.normal)
+
 #---------------------------------------------------------------function body----------------------------------------------------------------------
 def smooth_selected_normals(data):
     normals = get_loop_normals(data)
@@ -102,7 +107,6 @@ def smooth_selected_normals(data):
         cn = mathutils.Vector(vnormals[v.index])
         for e in edges[v.index]:
             cn += vnormals[e]
-            print(vnormals[e])
         
         cn.normalize()
         for f in to_loops[v.index]:
@@ -158,18 +162,16 @@ def set_face_normal(data):
 # else return [normal, bm.select_history.active.index, loop_index]
 def get_active_normal(context,ob):
     scn = context.scene.dskjal_sn_props
-    bm = bmesh.from_edit_mesh(ob.data)
-    ensure_lookup_table(bm)
-    active = bm.select_history.active
-    if not active:
+    active = get_active_vertex(ob)
+    if active == None:
         return None
 
-    index = active.index
+    index = active[0]
     to_loops = create_loop_table(ob.data)
     loop_normals = get_loop_normals(ob.data)
     loop_index = -1
 
-    normal = active.normal
+    normal = active[1]
     if bpy.context.scene.tool_settings.mesh_select_mode[0]:
         #vertex
         if scn.ne_split_mode:
@@ -206,11 +208,10 @@ def update_active_normal(context, ob):
 def set_normal_to_selected(context, normal):
     scn = context.scene.dskjal_sn_props
     o = context.active_object   
-    bm = bmesh.from_edit_mesh(o.data)
-    ensure_lookup_table(bm)  
-    if not hasattr(bm.select_history.active,'index'):
+    active = get_active_vertex(o)
+    if active == None:
         return
-    index = bm.select_history.active.index
+    index = active[0]
 
     bpy.ops.object.mode_set(mode='OBJECT')
 
@@ -233,7 +234,6 @@ def set_normal_to_selected(context, normal):
     else:
         set_same_normal(o.data, normal)
 
-    update_scene()
     bpy.ops.object.mode_set(mode='EDIT')        
   
 #----------------------------------------------------show normal tools----------------------------------------------------------
@@ -315,9 +315,10 @@ def index_callback(self, context):
     scn = context.scene.dskjal_sn_props
     if scn.ne_split_mode:
         o = context.active_object   
-        bm = bmesh.from_edit_mesh(o.data)
-        ensure_lookup_table(bm)  
-        index = bm.select_history.active.index
+        active = get_active_vertex(o) 
+        if active == None:
+            return
+        index = active[0]
 
         loop_index = scn.ne_view_normal_index
         to_loops = create_loop_table(o.data)
@@ -403,9 +404,9 @@ class DSKJAL_OT_SmoothButton(bpy.types.Operator):
     
     bpy.ops.object.mode_set(mode='OBJECT')
     smooth_selected_normals(o.data)
-    update_scene()
     bpy.ops.object.mode_set(mode='EDIT')
     update_active_normal(context,o)
+    update_scene()
     bpy.ops.object.mode_set(mode='EDIT')
 
     return{'FINISHED'}
@@ -419,9 +420,9 @@ class DSKJAL_OT_RevertButton(bpy.types.Operator):
         
         bpy.ops.object.mode_set(mode='OBJECT')       
         restore_selected_normals(o.data)
-        update_scene()
         bpy.ops.object.mode_set(mode='EDIT')
         update_active_normal(context, o)
+        update_scene()
         bpy.ops.object.mode_set(mode='EDIT')
 
         return{'FINISHED'}
@@ -462,9 +463,9 @@ class DSKJAL_OT_PasteButton(bpy.types.Operator):
     
     def execute(self, context):
         set_normal_to_selected(context, context.scene.dskjal_sn_props.ne_view_normal_cache)
-        update_scene()
         bpy.ops.object.mode_set(mode='EDIT')
         update_active_normal(context,context.active_object)
+        update_scene()
         bpy.ops.object.mode_set(mode='EDIT')
                     
         return {'FINISHED'}
@@ -496,11 +497,9 @@ def global_callback_handler():
             scn.ne_window_rotation = new_rotation
 
         #active vertex changed
-        bm = bmesh.from_edit_mesh(ob.data)
-        ensure_lookup_table(bm)  
-        active = bm.select_history.active
-        if active!=None:
-            index = active.index
+        active = get_active_vertex(ob)
+        if active != None:
+            index = active[0]
             if index != scn.ne_last_selected_vert_index:
                 scn.ne_last_selected_vert_index = index
                 scn.ne_update_by_global_callback = True
