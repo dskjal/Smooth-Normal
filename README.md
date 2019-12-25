@@ -12,6 +12,9 @@ Location is Normal in tool shelf in Edit mode. "set face normal" is in face sele
 表示されるのはエディットモードの時のみです．
 set face normal はフェース選択モードのときのみ表示されます．
 
+For version 2.80, when Split Mode is off, you can edit the normals of the vertices selected in circle selection and rectangle selection.  
+バージョン 2.80 用では Split Mode がオフの時は円選択・矩形選択で選択した頂点の法線も編集できます。  
+
 If you use A key or circle select or border select, you can not edit the normals. In that situation deselect one element and select the element again. By that operation, you can edit all the normals of the elements. Since BMesh's select_history is not able to get by multi select tool, that operation needed.  
 A キーや円選択・矩形選択で選択すると法線を編集できません。その時は Shift を押しながら要素（頂点や面）をひとつ選択解除してから、その要素を再選択すると選択したすべての要素の法線を編集できます。このような動作になっているのは複数の要素を同時に選択すると BMesh の select_history が取得できないからです。
 
