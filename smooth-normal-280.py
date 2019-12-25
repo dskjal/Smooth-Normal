@@ -207,32 +207,30 @@ def update_active_normal(context, ob):
 
 def set_normal_to_selected(context, normal):
     scn = context.scene.dskjal_sn_props
-    o = context.active_object   
-    active = get_active_vertex(o)
-    if active == None:
-        return
-    index = active[0]
-
+    o = context.active_object
     bpy.ops.object.mode_set(mode='OBJECT')
-
-    if scn.ne_split_mode:
-        if bpy.context.scene.tool_settings.mesh_select_mode[0]:
-            #split vertex mode
-            loop_index = scn.ne_view_normal_index
-            to_loops = create_loop_table(o.data)
-            if loop_index < len(to_loops[index]):
-                loop_index = to_loops[index][loop_index]                                
-                set_loop_normal(o.data, normal, [loop_index])
-        if bpy.context.scene.tool_settings.mesh_select_mode[2]:
-            #split face mode
-            selected = [p for p in o.data.polygons if p.select]
-            loop_index = []
-            for s in selected:
-                for i in range( s.loop_start, s.loop_start + s.loop_total ):
-                    loop_index.append(i)  
-            set_loop_normal(o.data, normal, loop_index)
-    else:
+    if not scn.ne_split_mode:
         set_same_normal(o.data, normal)
+    else:
+        active = get_active_vertex(o)
+        if active != None:
+            index = active[0]
+
+            if bpy.context.scene.tool_settings.mesh_select_mode[0]:
+                #split vertex mode
+                loop_index = scn.ne_view_normal_index
+                to_loops = create_loop_table(o.data)
+                if loop_index < len(to_loops[index]):
+                    loop_index = to_loops[index][loop_index]                                
+                    set_loop_normal(o.data, normal, [loop_index])
+            if bpy.context.scene.tool_settings.mesh_select_mode[2]:
+                #split face mode
+                selected = [p for p in o.data.polygons if p.select]
+                loop_index = []
+                for s in selected:
+                    for i in range( s.loop_start, s.loop_start + s.loop_total ):
+                        loop_index.append(i)  
+                set_loop_normal(o.data, normal, loop_index)
 
     bpy.ops.object.mode_set(mode='EDIT')        
   
