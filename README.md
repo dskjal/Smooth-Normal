@@ -23,3 +23,7 @@ When smooth result is ugly, run revert with all selected vertices. It may run co
 
 Mask Color can change in Blender User Preferences > System > Custom Weight Paint Range.  
 頂点色が見づらいときは Blender ユーザー設定 > システム > ウェイトペイントの色の設定で色を変更できます．
+
+## そのほかの法線編集アドオン Alternative
+[Yet Another Vertex Normal Editor (Y.A.V.N.E.)](https://github.com/fedackb/yavne)  
+重複頂点の法線の一致や法線の転送等の機能がある法線編集アドオン。
