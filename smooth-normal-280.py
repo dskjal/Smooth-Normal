@@ -80,7 +80,10 @@ def create_loop_table(data):
 # else return (index, normal)
 def get_active_vertex(object):
     old_mode = object.mode
-    bpy.ops.object.mode_set(mode='EDIT')
+    try:
+        bpy.ops.object.mode_set(mode='EDIT')
+    except:
+        return None
 
     bm = bmesh.from_edit_mesh(object.data)
     bm.verts.ensure_lookup_table()
