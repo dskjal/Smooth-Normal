@@ -26,8 +26,8 @@ from bpy.props import *
 bl_info = {
     "name" : "Normal Smooth Tool",             
     "author" : "dskjal",                  
-    "version" : (4,4),                  
-    "blender" : (2, 80, 0),              
+    "version" : (4,5),                  
+    "blender" : (2, 83, 5),              
     "location" : "View3D > Side Bar > Normal",   
     "description" : "Edit Custom Normal(s)",   
     "warning" : "",
@@ -79,14 +79,20 @@ def create_loop_table(data):
 # return None if can not get
 # else return (index, normal)
 def get_active_vertex(object):
+    old_mode = object.mode
+    bpy.ops.object.mode_set(mode='EDIT')
+
     bm = bmesh.from_edit_mesh(object.data)
     bm.verts.ensure_lookup_table()
     bm.edges.ensure_lookup_table()
     bm.faces.ensure_lookup_table()
-    if not hasattr(bm.select_history.active,'index'):
-        return None
-    return (bm.select_history.active.index, bm.select_history.active.normal)
 
+    ret = None
+    if hasattr(bm.select_history.active,'index'):
+        ret = (bm.select_history.active.index, bm.select_history.active.normal)
+
+    bpy.ops.object.mode_set(mode=old_mode)
+    return ret
 #---------------------------------------------------------------function body----------------------------------------------------------------------
 def smooth_selected_normals(data):
     normals = get_loop_normals(data)
