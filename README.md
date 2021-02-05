@@ -26,6 +26,10 @@ Mask Color can change in Blender User Preferences > System > Custom Weight Paint
 
 ## そのほかの法線編集アドオン Alternative  
 ### [Abnormal](https://github.com/BlenderNPR/Abnormal)
-高機能な法線編集アドオン。  
+高機能な法線編集アドオン。
+
+### [Normal Brush for Blender](https://github.com/blackears/blenderNormalBrush)
+ブラシで法線を編集できるアドオン。
+
 ### [Yet Another Vertex Normal Editor (Y.A.V.N.E.)](https://github.com/fedackb/yavne)
 重複頂点の法線の一致や法線の転送等の機能がある法線編集アドオン。
