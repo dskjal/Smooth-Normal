@@ -26,8 +26,8 @@ from bpy.props import *
 bl_info = {
     "name" : "Normal Smooth Tool",             
     "author" : "dskjal",                  
-    "version" : (4,5),                  
-    "blender" : (2, 83, 5),              
+    "version" : (4,6),                  
+    "blender" : (2, 83, 5),
     "location" : "View3D > Side Bar > Normal",   
     "description" : "Edit Custom Normal(s)",   
     "warning" : "",
@@ -39,6 +39,7 @@ bl_info = {
 def update_scene():
     bpy.context.evaluated_depsgraph_get().update()
 
+# require Object mode
 def get_vertex_normal(data, index):
     normal = data.vertices[index].normal
     if data.has_custom_normals:
@@ -48,10 +49,15 @@ def get_vertex_normal(data, index):
     
     return normal
 
+# require Object mode
+def calc_normals_split(data):
+    data.calc_normals_split()
+
+# require Object mode
 def get_vertex_normals(data):
     normals = [(0.0,0.0,0.0)]*len(data.vertices)
     if data.has_custom_normals:
-        data.calc_normals_split()
+        calc_normals_split(data)
         for poly in data.polygons:
           for i in range( poly.loop_start, poly.loop_start + poly.loop_total ):
               l = data.loops[i]
@@ -62,10 +68,12 @@ def get_vertex_normals(data):
             
     return normals
 
+# require Object mode
 def get_loop_normals(data):
-    data.calc_normals_split()
+    calc_normals_split(data)
     return [l.normal for l in data.loops]
     
+# require Object mode
 def create_loop_table(data):
     to_loops = [[] for row in range(len(data.vertices))]
         
@@ -78,14 +86,12 @@ def create_loop_table(data):
 
 # return None if can not get
 # else return (index, normal)
-def get_active_vertex(object):
-    old_mode = object.mode
-    try:
-        bpy.ops.object.mode_set(mode='EDIT')
-    except:
+# require Edit mode
+def get_active_vertex_ed(o):
+    if o.mode != 'EDIT':
         return None
 
-    bm = bmesh.from_edit_mesh(object.data)
+    bm = bmesh.from_edit_mesh(o.data)
     bm.verts.ensure_lookup_table()
     bm.edges.ensure_lookup_table()
     bm.faces.ensure_lookup_table()
@@ -93,11 +99,18 @@ def get_active_vertex(object):
     ret = None
     if hasattr(bm.select_history.active,'index'):
         ret = (bm.select_history.active.index, bm.select_history.active.normal)
+    else:
+        bpy.ops.object.mode_set(mode='OBJECT')
+        for v in o.data.vertices:
+            if v.select:
+                ret = (v.index, v.normal)
+                break
+        bpy.ops.object.mode_set(mode='EDIT')
 
-    bpy.ops.object.mode_set(mode=old_mode)
     return ret
 #---------------------------------------------------------------function body----------------------------------------------------------------------
 def smooth_selected_normals(data):
+    bpy.ops.object.mode_set(mode='OBJECT')
     normals = get_loop_normals(data)
     out_normals = copy.deepcopy(normals)  
     vnormals = get_vertex_normals(data)
@@ -122,8 +135,10 @@ def smooth_selected_normals(data):
             out_normals[f] = cn
         
     data.normals_split_custom_set(out_normals)
+    bpy.ops.object.mode_set(mode='EDIT')
 
 def restore_selected_normals(data):
+    bpy.ops.object.mode_set(mode='OBJECT')
     normals = get_loop_normals(data)
     to_loops = create_loop_table(data)
     
@@ -133,8 +148,10 @@ def restore_selected_normals(data):
             normals[f] = s.normal
             
     data.normals_split_custom_set(normals)
+    bpy.ops.object.mode_set(mode='EDIT')
 
 def set_same_normal(data, normal):
+    bpy.ops.object.mode_set(mode='OBJECT')
     normals = get_loop_normals(data)  
     to_loops = create_loop_table(data)
         
@@ -145,8 +162,10 @@ def set_same_normal(data, normal):
             normals[f] = normal
         
     data.normals_split_custom_set(normals)
+    bpy.ops.object.mode_set(mode='EDIT')
    
 def set_loop_normal(data, normal, loop_index):
+    bpy.ops.object.mode_set(mode='OBJECT')
     normals = get_loop_normals(data)  
         
     #update normals
@@ -155,8 +174,10 @@ def set_loop_normal(data, normal, loop_index):
         normals[s] = normal
 
     data.normals_split_custom_set(normals)
+    bpy.ops.object.mode_set(mode='EDIT')
 
 def set_face_normal(data):
+    bpy.ops.object.mode_set(mode='OBJECT')
     normals = get_loop_normals(data)
 
     selected = [p for p in data.polygons if p.select]
@@ -164,14 +185,15 @@ def set_face_normal(data):
         for i in range( s.loop_start, s.loop_start + s.loop_total ):
             normals[i] = s.normal      
     
-    data.normals_split_custom_set(normals)  
+    data.normals_split_custom_set(normals)
+    bpy.ops.object.mode_set(mode='EDIT')
 
 # BMesh become invalid
 # if there is no active, return None
 # else return [normal, bm.select_history.active.index, loop_index]
 def get_active_normal(context,ob):
     scn = context.scene.dskjal_sn_props
-    active = get_active_vertex(ob)
+    active = get_active_vertex_ed(ob)
     if active == None:
         return None
 
@@ -205,7 +227,7 @@ def update_active_normal(context, ob):
 
     if scn.ne_split_mode:
         loop_index = normal[2]
-        if loop_index!=-1:
+        if loop_index != -1:
             normal = ob.data.loops[loop_index].normal
         else:
             normal = normal[0]
@@ -217,23 +239,23 @@ def update_active_normal(context, ob):
 def set_normal_to_selected(context, normal):
     scn = context.scene.dskjal_sn_props
     o = context.active_object
-    bpy.ops.object.mode_set(mode='OBJECT')
     if not scn.ne_split_mode:
         set_same_normal(o.data, normal)
     else:
-        active = get_active_vertex(o)
+        bpy.ops.object.mode_set(mode='EDIT')
+        active = get_active_vertex_ed(o)
         if active != None:
             index = active[0]
 
             if bpy.context.scene.tool_settings.mesh_select_mode[0]:
-                #split vertex mode
+                # split vertex mode
                 loop_index = scn.ne_view_normal_index
                 to_loops = create_loop_table(o.data)
                 if loop_index < len(to_loops[index]):
-                    loop_index = to_loops[index][loop_index]                                
+                    loop_index = to_loops[index][loop_index]
                     set_loop_normal(o.data, normal, [loop_index])
             if bpy.context.scene.tool_settings.mesh_select_mode[2]:
-                #split face mode
+                # split face mode
                 selected = [p for p in o.data.polygons if p.select]
                 loop_index = []
                 for s in selected:
@@ -256,8 +278,9 @@ def window_matrix_handler():
         for area in bpy.context.screen.areas:
             if area.type == "VIEW_3D":
                 bpy.context.scene.dskjal_sn_props.ne_window_rotation = area.spaces[0].region_3d.view_rotation
+                bpy.context.scene.dskjal_sn_props.ne_window_rotation_available = True
     except:
-        bpy.context.scene.dskjal_sn_props.ne_window_rotation = (0,0,0,0)
+        bpy.context.scene.dskjal_sn_props.ne_window_rotation_available = False
 
 def get_view_rotational_matrix(reverse=False):
     qt = mathutils.Quaternion(bpy.context.scene.dskjal_sn_props.ne_window_rotation)
@@ -283,6 +306,8 @@ def view_normal_callback(self, context):
         return
 
     real_normal = scn.ne_view_normal
+    if real_normal[0] == 0 and real_normal[1] == 0 and real_normal[2] == 0:
+        real_normal[0] = 0.001
     if scn.ne_view_sync_mode:
         mView = get_view_rotational_matrix()
         mObject = get_object_rotational_matrix()
@@ -322,7 +347,7 @@ def index_callback(self, context):
     scn = context.scene.dskjal_sn_props
     if scn.ne_split_mode:
         o = context.active_object   
-        active = get_active_vertex(o) 
+        active = get_active_vertex_ed(o) 
         if active == None:
             return
         index = active[0]
@@ -330,7 +355,7 @@ def index_callback(self, context):
         loop_index = scn.ne_view_normal_index
         to_loops = create_loop_table(o.data)
         if loop_index < len(to_loops[index]):
-            o.data.calc_normals_split()
+            calc_normals_split(o.data)
             loop_index = to_loops[index][loop_index]
             rotated = o.data.loops[loop_index].normal
             if scn.ne_view_sync_mode:
@@ -360,8 +385,7 @@ class DSKJAL_PT_UI(bpy.types.Panel):
   def poll(self,context):
     ob = context.active_object
     scn = context.scene
-    if context.object and context.object.type == 'MESH' and context.object.mode == 'EDIT':
-        return 1
+    return context.object and context.object.type in ('MESH', 'EDIT')
                  
   def draw(self, context):
     layout = self.layout
@@ -376,7 +400,13 @@ class DSKJAL_PT_UI(bpy.types.Panel):
     row.prop(overlay, "show_split_normals", text="", icon="NORMALS_VERTEX_FACE")
     row.prop(overlay, "normals_length", text="Size")
     layout.separator()
-    
+
+    if ob.mode != 'EDIT':
+        return
+    if bpy.context.scene.tool_settings.mesh_select_mode[1]:
+        # edge select mode
+        return
+
     #show normal
     layout.separator()
     layout.label(text="Edit Normal:")
@@ -409,12 +439,9 @@ class DSKJAL_OT_SmoothButton(bpy.types.Operator):
   def execute(self, context):
     o = bpy.context.view_layer.objects.active
     
-    bpy.ops.object.mode_set(mode='OBJECT')
     smooth_selected_normals(o.data)
-    bpy.ops.object.mode_set(mode='EDIT')
     update_active_normal(context,o)
     update_scene()
-    bpy.ops.object.mode_set(mode='EDIT')
 
     return{'FINISHED'}
     
@@ -425,12 +452,9 @@ class DSKJAL_OT_RevertButton(bpy.types.Operator):
     def execute(self, context):
         o = bpy.context.view_layer.objects.active
         
-        bpy.ops.object.mode_set(mode='OBJECT')       
         restore_selected_normals(o.data)
-        bpy.ops.object.mode_set(mode='EDIT')
         update_active_normal(context, o)
         update_scene()
-        bpy.ops.object.mode_set(mode='EDIT')
 
         return{'FINISHED'}
     
@@ -441,12 +465,9 @@ class DSKJAL_OT_SetFaceNormal(bpy.types.Operator):
     def execute(self, context):
         o = bpy.context.view_layer.objects.active
         
-        bpy.ops.object.mode_set(mode='OBJECT')
         set_face_normal(o.data)
         update_scene()
-        bpy.ops.object.mode_set(mode='EDIT')
         #update_active_normal(context, o)
-        #bpy.ops.object.mode_set(mode='EDIT')
         
         return {'FINISHED'}
     
@@ -470,10 +491,10 @@ class DSKJAL_OT_PasteButton(bpy.types.Operator):
     
     def execute(self, context):
         set_normal_to_selected(context, context.scene.dskjal_sn_props.ne_view_normal_cache)
-        bpy.ops.object.mode_set(mode='EDIT')
+        #bpy.ops.object.mode_set(mode='EDIT')
         update_active_normal(context,context.active_object)
         update_scene()
-        bpy.ops.object.mode_set(mode='EDIT')
+        #bpy.ops.object.mode_set(mode='EDIT')
                     
         return {'FINISHED'}
     
@@ -483,7 +504,7 @@ def is_normal_active(ob):
     return bpy.context.scene.dskjal_sn_props.ne_view_sync_mode
 
 def get_window_rotation():
-    if bpy.context.scene.dskjal_sn_props.ne_window_rotation != (0,0,0,0):
+    if bpy.context.scene.dskjal_sn_props.ne_window_rotation_available:
         return bpy.context.scene.dskjal_sn_props.ne_window_rotation
     return None
 
@@ -504,7 +525,7 @@ def global_callback_handler():
             scn.ne_window_rotation = new_rotation
 
         #active vertex changed
-        active = get_active_vertex(ob)
+        active = get_active_vertex_ed(ob)
         if active != None:
             index = active[0]
             if index != scn.ne_last_selected_vert_index:
@@ -521,6 +542,7 @@ class DSKJAL_SN_Props(bpy.types.PropertyGroup):
     ne_last_selected_vert_index : bpy.props.IntProperty(default=-1)
     ne_view_orientation : bpy.props.FloatVectorProperty(name="",default=(1,1,0,0),size=4,update=view_orientation_callback)
     ne_window_rotation : bpy.props.FloatVectorProperty(name="",default=(1,1,0,0),size=4)
+    ne_window_rotation_available : bpy.props.BoolProperty(default=False)
 
     #for show normals
     ne_view_sync_mode : bpy.props.BoolProperty(name="View Sync Mode",default=True,update=view_sync_toggle_callback)
@@ -532,6 +554,13 @@ class DSKJAL_SN_Props(bpy.types.PropertyGroup):
     ne_type_normal : bpy.props.FloatVectorProperty(name="",subtype='XYZ',update=type_direction_callback)
     ne_update_by_global_callback : bpy.props.BoolProperty(name="Split Mode",default=True)
         
+class Handler_Class:
+    def __init__(self):
+        self.handle = bpy.types.SpaceView3D.draw_handler_add(window_matrix_handler, (), 'WINDOW', 'POST_PIXEL')
+
+    def remove_handle(self):
+        bpy.types.SpaceView3D.draw_handler_remove(self.handle, 'WINDOW')
+
 classes = (
     DSKJAL_PT_UI,
     DSKJAL_OT_SmoothButton,
@@ -541,18 +570,18 @@ classes = (
     DSKJAL_OT_PasteButton,
     DSKJAL_SN_Props
 )
-draw_handle = None
+
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
 
     bpy.types.Scene.dskjal_sn_props = bpy.props.PointerProperty(type=DSKJAL_SN_Props)
     bpy.app.timers.register(global_callback_handler, persistent=True)
-    draw_handle = bpy.types.SpaceView3D.draw_handler_add(window_matrix_handler, (), 'WINDOW', 'POST_PIXEL')
+    bpy.app.driver_namespace['handler'] = Handler_Class()
+    #draw_handle = bpy.types.SpaceView3D.draw_handler_add(window_matrix_handler, (), 'WINDOW', 'POST_PIXEL')
 
 def unregister():
-    if draw_handle != None:
-        bpy.types.SpaceView3D.draw_handler_remove(draw_handle, 'WINDOW')
+    bpy.app.driver_namespace['handler'].remove_handle()
     bpy.app.timers.unregister(global_callback_handler)
     if hasattr(bpy.types.Scene, "dskjal_sn_props"): del bpy.types.Scene.dskjal_sn_props
 
