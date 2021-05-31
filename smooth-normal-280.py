@@ -26,7 +26,7 @@ from bpy.props import *
 bl_info = {
     "name" : "Normal Smooth Tool",             
     "author" : "dskjal",                  
-    "version" : (4,6),                  
+    "version" : (4, 7),                  
     "blender" : (2, 83, 5),
     "location" : "View3D > Side Bar > Normal",   
     "description" : "Edit Custom Normal(s)",   
@@ -59,9 +59,9 @@ def get_vertex_normals(data):
     if data.has_custom_normals:
         calc_normals_split(data)
         for poly in data.polygons:
-          for i in range( poly.loop_start, poly.loop_start + poly.loop_total ):
-              l = data.loops[i]
-              normals[l.vertex_index] = l.normal         
+            for i in range( poly.loop_start, poly.loop_start + poly.loop_total ):
+                l = data.loops[i]
+                normals[l.vertex_index] = l.normal         
     else:
         for i in data.vertices:
             normals[i.index] = i.normal
@@ -384,8 +384,7 @@ class DSKJAL_PT_UI(bpy.types.Panel):
   @classmethod
   def poll(self,context):
     ob = context.active_object
-    scn = context.scene
-    return context.object and context.object.type in ('MESH', 'EDIT')
+    return ob and ob.type == 'MESH' and ob.mode == 'EDIT'
                  
   def draw(self, context):
     layout = self.layout
@@ -491,10 +490,8 @@ class DSKJAL_OT_PasteButton(bpy.types.Operator):
     
     def execute(self, context):
         set_normal_to_selected(context, context.scene.dskjal_sn_props.ne_view_normal_cache)
-        #bpy.ops.object.mode_set(mode='EDIT')
         update_active_normal(context,context.active_object)
         update_scene()
-        #bpy.ops.object.mode_set(mode='EDIT')
                     
         return {'FINISHED'}
     
@@ -578,7 +575,6 @@ def register():
     bpy.types.Scene.dskjal_sn_props = bpy.props.PointerProperty(type=DSKJAL_SN_Props)
     bpy.app.timers.register(global_callback_handler, persistent=True)
     bpy.app.driver_namespace['handler'] = Handler_Class()
-    #draw_handle = bpy.types.SpaceView3D.draw_handler_add(window_matrix_handler, (), 'WINDOW', 'POST_PIXEL')
 
 def unregister():
     bpy.app.driver_namespace['handler'].remove_handle()
