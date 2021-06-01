@@ -26,7 +26,7 @@ from bpy.props import *
 bl_info = {
     "name" : "Normal Smooth Tool",             
     "author" : "dskjal",                  
-    "version" : (4, 8),                  
+    "version" : (4, 9),                  
     "blender" : (2, 83, 5),
     "location" : "View3D > Side Bar > Normal",   
     "description" : "Edit Custom Normal(s)",   
@@ -108,6 +108,13 @@ def get_active_vertex_ed(o):
         bpy.ops.object.mode_set(mode='EDIT')
 
     return ret
+
+def is_split_mode():
+    return bpy.context.scene.dskjal_sn_props.ne_split_mode
+
+def get_loop_index():
+    return bpy.context.scene.dskjal_sn_props.ne_view_normal_index
+
 #---------------------------------------------------------------function body----------------------------------------------------------------------
 def smooth_selected_normals(data):
     bpy.ops.object.mode_set(mode='OBJECT')
@@ -192,7 +199,6 @@ def set_face_normal(data):
 # if there is no active, return None
 # else return [normal, bm.select_history.active.index, loop_index]
 def get_active_normal(context,ob):
-    scn = context.scene.dskjal_sn_props
     active = get_active_vertex_ed(ob)
     if active == None:
         return None
@@ -205,8 +211,8 @@ def get_active_normal(context,ob):
     normal = active[1]
     if bpy.context.scene.tool_settings.mesh_select_mode[0]:
         #vertex
-        if scn.ne_split_mode:
-            loop_index = scn.ne_view_normal_index
+        if is_split_mode():
+            loop_index = get_loop_index()
             if loop_index < len(to_loops[index]):
                 loop_index = to_loops[index][loop_index]
                 normal = ob.data.loops[loop_index].normal
@@ -225,7 +231,7 @@ def update_active_normal(context, ob):
     if normal==None:
         return
 
-    if scn.ne_split_mode:
+    if is_split_mode():
         loop_index = normal[2]
         if loop_index != -1:
             normal = ob.data.loops[loop_index].normal
@@ -237,31 +243,31 @@ def update_active_normal(context, ob):
     scn.ne_type_normal = normal
 
 def set_normal_to_selected(context, normal):
-    scn = context.scene.dskjal_sn_props
     o = context.active_object
-    if not scn.ne_split_mode:
+    if not is_split_mode():
         set_same_normal(o.data, normal)
     else:
         bpy.ops.object.mode_set(mode='EDIT')
         active = get_active_vertex_ed(o)
-        if active != None:
-            index = active[0]
+        if active == None:
+            return
 
-            if bpy.context.scene.tool_settings.mesh_select_mode[0]:
-                # split vertex mode
-                loop_index = scn.ne_view_normal_index
-                to_loops = create_loop_table(o.data)
-                if loop_index < len(to_loops[index]):
-                    loop_index = to_loops[index][loop_index]
-                    set_loop_normal(o.data, normal, [loop_index])
-            if bpy.context.scene.tool_settings.mesh_select_mode[2]:
-                # split face mode
-                selected = [p for p in o.data.polygons if p.select]
-                loop_index = []
-                for s in selected:
-                    for i in range( s.loop_start, s.loop_start + s.loop_total ):
-                        loop_index.append(i)  
-                set_loop_normal(o.data, normal, loop_index)
+        index = active[0]
+        if bpy.context.scene.tool_settings.mesh_select_mode[0]:
+            # split vertex mode
+            loop_index = get_loop_index()
+            to_loops = create_loop_table(o.data)
+            if loop_index < len(to_loops[index]):
+                loop_index = to_loops[index][loop_index]
+                set_loop_normal(o.data, normal, [loop_index])
+        if bpy.context.scene.tool_settings.mesh_select_mode[2]:
+            # split face mode
+            selected = [p for p in o.data.polygons if p.select]
+            loop_index = []
+            for s in selected:
+                for i in range( s.loop_start, s.loop_start + s.loop_total ):
+                    loop_index.append(i)  
+            set_loop_normal(o.data, normal, loop_index)
 
     bpy.ops.object.mode_set(mode='EDIT')        
   
@@ -289,9 +295,6 @@ def get_view_rotational_matrix(reverse=False):
 
     return qt.to_matrix()
 
-def get_object_rotational_matrix():
-    return mathutils.Matrix(bpy.context.view_layer.objects.active.matrix_world).to_quaternion().to_matrix()
-
 def rot_vector(v, axis='X', reverse=False, angle=90):
     angle = math.radians(-angle if reverse else angle)
     mRot = mathutils.Matrix.Rotation(angle, 3, 'X')
@@ -301,7 +304,7 @@ def rot_with_view_matrix(vector, reverse=False):
     v = copy.deepcopy(vector)
     if bpy.context.scene.dskjal_sn_props.ne_view_sync_mode:
         mView = get_view_rotational_matrix(reverse=reverse)
-        mObject = get_object_rotational_matrix()
+        mObject = mathutils.Matrix(bpy.context.view_layer.objects.active.matrix_world).to_quaternion().to_matrix() # get object rotational matrix
         if reverse:
             v = mView @ mObject @ v
         else:
@@ -327,7 +330,7 @@ def type_direction_callback(self, context):
     v = mathutils.Vector(scn.ne_type_normal)
     v.normalize()
 
-    v = rot_with_view_matrix(v, reverse=True)
+    v_view = rot_with_view_matrix(v, reverse=True)
 
     if not is_same_vector(scn.ne_type_normal, scn.ne_type_normal_old):
         if not scn.ne_update_by_global_callback:
@@ -337,11 +340,10 @@ def type_direction_callback(self, context):
     # update direction sphere
     # avoid recursive call
     scn.ne_update_by_global_callback = True
-    scn.ne_view_normal = v
+    scn.ne_view_normal = v_view
      
 def index_callback(self, context):
-    scn = context.scene.dskjal_sn_props
-    if not scn.ne_split_mode:
+    if not is_split_mode():
         return
 
     o = context.active_object   
@@ -350,12 +352,12 @@ def index_callback(self, context):
         return
     index = active[0]
 
-    loop_index = scn.ne_view_normal_index
+    loop_index = get_loop_index()
     to_loops = create_loop_table(o.data)
     if loop_index < len(to_loops[index]):
         calc_normals_split(o.data)
         loop_index = to_loops[index][loop_index]
-        scn.ne_view_normal = rot_with_view_matrix(o.data.loops[loop_index].normal, reverse=True)
+        context.scene.dskjal_sn_props.ne_view_normal = rot_with_view_matrix(o.data.loops[loop_index].normal, reverse=True)
 
 def view_orientation_callback(self, context):
     scn = context.scene.dskjal_sn_props
