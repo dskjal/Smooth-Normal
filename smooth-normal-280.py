@@ -423,17 +423,17 @@ class DSKJAL_PT_UI(bpy.types.Panel):
 
 #------------------------------------------------------------------ Operator ----------------------------------------------------
 class DSKJAL_OT_SmoothButton(bpy.types.Operator):
-  bl_idname = "smoothnormal.smoothnormals"
-  bl_label = "Smooth"
+    bl_idname = "smoothnormal.smoothnormals"
+    bl_label = "Smooth"
   
-  def execute(self, context):
-    o = bpy.context.view_layer.objects.active
+    def execute(self, context):
+        o = bpy.context.view_layer.objects.active
     
-    smooth_selected_normals(o.data)
-    update_active_normal(context,o)
-    update_scene()
+        smooth_selected_normals(o.data)
+        update_active_normal(context,o)
+        update_scene()
 
-    return{'FINISHED'}
+        return{'FINISHED'}
     
 class DSKJAL_OT_RevertButton(bpy.types.Operator):
     bl_idname = "smoothnormal.revert"
@@ -456,8 +456,8 @@ class DSKJAL_OT_SetFaceNormal(bpy.types.Operator):
         o = bpy.context.view_layer.objects.active
         
         set_face_normal(o.data)
+        update_active_normal(context, o)
         update_scene()
-        #update_active_normal(context, o)
         
         return {'FINISHED'}
     
