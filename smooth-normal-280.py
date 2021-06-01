@@ -26,7 +26,7 @@ from bpy.props import *
 bl_info = {
     "name" : "Normal Smooth Tool",             
     "author" : "dskjal",                  
-    "version" : (4, 7),                  
+    "version" : (4, 8),                  
     "blender" : (2, 83, 5),
     "location" : "View3D > Side Bar > Normal",   
     "description" : "Edit Custom Normal(s)",   
@@ -297,6 +297,21 @@ def rot_vector(v, axis='X', reverse=False, angle=90):
     mRot = mathutils.Matrix.Rotation(angle, 3, 'X')
     return mRot @ v
 
+def rot_with_view_matrix(vector, reverse=False):
+    v = copy.deepcopy(vector)
+    if bpy.context.scene.dskjal_sn_props.ne_view_sync_mode:
+        mView = get_view_rotational_matrix(reverse=reverse)
+        mObject = get_object_rotational_matrix()
+        if reverse:
+            v = mView @ mObject @ v
+        else:
+            mObject.transpose()
+            v = mObject @ mView @ v
+    else:
+        v = rot_vector(v, reverse=reverse)
+    
+    return v
+
 def view_normal_callback(self, context):
     scn = context.scene.dskjal_sn_props
 
@@ -305,66 +320,42 @@ def view_normal_callback(self, context):
         scn.ne_update_by_global_callback = False
         return
 
-    real_normal = scn.ne_view_normal
-    if real_normal[0] == 0 and real_normal[1] == 0 and real_normal[2] == 0:
-        real_normal[0] = 0.001
-    if scn.ne_view_sync_mode:
-        mView = get_view_rotational_matrix()
-        mObject = get_object_rotational_matrix()
-        mObject.transpose()
-        real_normal = mObject @ mView @ real_normal
-    else:
-        real_normal = rot_vector(real_normal)
-    
-    scn.ne_type_normal = real_normal
+    scn.ne_type_normal = rot_with_view_matrix(scn.ne_view_normal, reverse=False)
 
 def type_direction_callback(self, context):
     scn = context.scene.dskjal_sn_props
     v = mathutils.Vector(scn.ne_type_normal)
-    
-    nv = copy.deepcopy(v)
-    nv.normalize()
-    rotated = nv
+    v.normalize()
 
-    if scn.ne_view_sync_mode:
-        mView = get_view_rotational_matrix(True)
-        mObject = get_object_rotational_matrix()
-        rotated = mView @ mObject @ nv
-    else:
-        rotated = rot_vector(nv, reverse=True)
+    v = rot_with_view_matrix(v, reverse=True)
 
     if not is_same_vector(scn.ne_type_normal, scn.ne_type_normal_old):
         if not scn.ne_update_by_global_callback:
-            set_normal_to_selected(context, nv)
+            set_normal_to_selected(context, v)
         scn.ne_type_normal_old = scn.ne_type_normal
 
     # update direction sphere
     # avoid recursive call
     scn.ne_update_by_global_callback = True
-    scn.ne_view_normal = rotated
+    scn.ne_view_normal = v
      
 def index_callback(self, context):
     scn = context.scene.dskjal_sn_props
-    if scn.ne_split_mode:
-        o = context.active_object   
-        active = get_active_vertex_ed(o) 
-        if active == None:
-            return
-        index = active[0]
+    if not scn.ne_split_mode:
+        return
 
-        loop_index = scn.ne_view_normal_index
-        to_loops = create_loop_table(o.data)
-        if loop_index < len(to_loops[index]):
-            calc_normals_split(o.data)
-            loop_index = to_loops[index][loop_index]
-            rotated = o.data.loops[loop_index].normal
-            if scn.ne_view_sync_mode:
-                mView = get_view_rotational_matrix(True)
-                mObject = get_object_rotational_matrix()
-                rotated = mView @ mObject @ rotated
-            else:
-                rotated = rot_vector(rotated, reverse=True)
-            scn.ne_view_normal = rotated
+    o = context.active_object   
+    active = get_active_vertex_ed(o) 
+    if active == None:
+        return
+    index = active[0]
+
+    loop_index = scn.ne_view_normal_index
+    to_loops = create_loop_table(o.data)
+    if loop_index < len(to_loops[index]):
+        calc_normals_split(o.data)
+        loop_index = to_loops[index][loop_index]
+        scn.ne_view_normal = rot_with_view_matrix(o.data.loops[loop_index].normal, reverse=True)
 
 def view_orientation_callback(self, context):
     scn = context.scene.dskjal_sn_props
