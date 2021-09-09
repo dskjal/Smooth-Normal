@@ -26,7 +26,7 @@ from bpy.props import *
 bl_info = {
     "name" : "Normal Smooth Tool",             
     "author" : "dskjal",                  
-    "version" : (4, 9),                  
+    "version" : (4, 10),                  
     "blender" : (2, 83, 5),
     "location" : "View3D > Side Bar > Normal",   
     "description" : "Edit Custom Normal(s)",   
