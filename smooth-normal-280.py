@@ -91,21 +91,27 @@ def get_active_vertex_ed(o):
     if o.mode != 'EDIT':
         return None
 
-    bm = bmesh.from_edit_mesh(o.data)
-    bm.verts.ensure_lookup_table()
-    bm.edges.ensure_lookup_table()
-    bm.faces.ensure_lookup_table()
+    # vertex weight can not drag when bmesh is accessed while dragging
+    # bm = bmesh.from_edit_mesh(o.data)
+    # bm.verts.ensure_lookup_table()
+    # bm.edges.ensure_lookup_table()
+    # bm.faces.ensure_lookup_table()
+
+    # if hasattr(bm.select_history.active, 'index'):
+    #     ret = (bm.select_history.active.index, bm.select_history.active.normal)
+    # else:
+    #     bpy.ops.object.mode_set(mode='OBJECT')
+    #     for v in o.data.vertices:
+    #         if v.select:
+    #             ret = (v.index, v.normal)
+    #             break
+    #     bpy.ops.object.mode_set(mode='EDIT')
 
     ret = None
-    if hasattr(bm.select_history.active,'index'):
-        ret = (bm.select_history.active.index, bm.select_history.active.normal)
-    else:
-        bpy.ops.object.mode_set(mode='OBJECT')
-        for v in o.data.vertices:
-            if v.select:
-                ret = (v.index, v.normal)
-                break
-        bpy.ops.object.mode_set(mode='EDIT')
+    for v in o.data.vertices:
+        if v.select:
+            ret = (v.index, v.normal)
+            break
 
     return ret
 
@@ -540,16 +546,21 @@ class DSKJAL_SN_Props(bpy.types.PropertyGroup):
     ne_view_normal_index : bpy.props.IntProperty(name="index",default=0,min=0,update=index_callback)
     ne_type_normal_old : bpy.props.FloatVectorProperty(name="",default=(1,0,0),subtype='DIRECTION')
     ne_view_normal : bpy.props.FloatVectorProperty(name="",default=(1,0,0),subtype='DIRECTION',update=view_normal_callback)
-    ne_normal : bpy.props.FloatVectorProperty(name="",default=(1,0,0),subtype='DIRECTION')
     ne_type_normal : bpy.props.FloatVectorProperty(name="",subtype='XYZ',update=type_direction_callback)
     ne_update_by_global_callback : bpy.props.BoolProperty(name="Split Mode",default=True)
         
 class Handler_Class:
-    def __init__(self):
-        self.handle = bpy.types.SpaceView3D.draw_handler_add(window_matrix_handler, (), 'WINDOW', 'POST_PIXEL')
+    __handle = None
 
-    def remove_handle(self):
-        bpy.types.SpaceView3D.draw_handler_remove(self.handle, 'WINDOW')
+    @staticmethod
+    def add_handle():
+        Handler_Class.__handle = bpy.types.SpaceView3D.draw_handler_add(window_matrix_handler, (), 'WINDOW', 'POST_PIXEL')
+
+    @staticmethod
+    def remove_handle():
+        if Handler_Class.__handle != None:
+            bpy.types.SpaceView3D.draw_handler_remove(Handler_Class.__handle, 'WINDOW')
+            Handler_Class.__handle = None
 
 classes = (
     DSKJAL_PT_UI,
@@ -567,10 +578,10 @@ def register():
 
     bpy.types.Scene.dskjal_sn_props = bpy.props.PointerProperty(type=DSKJAL_SN_Props)
     bpy.app.timers.register(global_callback_handler, persistent=True)
-    bpy.app.driver_namespace['handler'] = Handler_Class()
+    Handler_Class.add_handle()
 
 def unregister():
-    bpy.app.driver_namespace['handler'].remove_handle()
+    Handler_Class.remove_handle()
     bpy.app.timers.unregister(global_callback_handler)
     if hasattr(bpy.types.Scene, "dskjal_sn_props"): del bpy.types.Scene.dskjal_sn_props
 
