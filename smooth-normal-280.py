@@ -91,6 +91,12 @@ def get_active_vertex_ed(o):
     if o.mode != 'EDIT':
         return None
 
+    for v in o.data.vertices:
+        if v.select:
+            return (v.index, v.normal)
+
+    return None
+    
     # vertex weight can not drag when bmesh is accessed while dragging
     # bm = bmesh.from_edit_mesh(o.data)
     # bm.verts.ensure_lookup_table()
@@ -106,14 +112,7 @@ def get_active_vertex_ed(o):
     #             ret = (v.index, v.normal)
     #             break
     #     bpy.ops.object.mode_set(mode='EDIT')
-
-    ret = None
-    for v in o.data.vertices:
-        if v.select:
-            ret = (v.index, v.normal)
-            break
-
-    return ret
+    # return ret
 
 def is_split_mode():
     return bpy.context.scene.dskjal_sn_props.ne_split_mode
