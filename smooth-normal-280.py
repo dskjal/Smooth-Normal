@@ -26,7 +26,7 @@ from bpy.props import *
 bl_info = {
     "name" : "Normal Smooth Tool",             
     "author" : "dskjal",                  
-    "version" : (4, 10),                  
+    "version" : (5, 0),                  
     "blender" : (2, 83, 5),
     "location" : "View3D > Side Bar > Normal",   
     "description" : "Edit Custom Normal(s)",   
@@ -88,7 +88,7 @@ def create_loop_table(data):
 # else return (index, normal)
 # require Edit mode
 def get_active_vertex_ed(o):
-    if o.mode != 'EDIT':
+    if o.mode != 'EDIT' or o.type != 'MESH':
         return None
 
     for v in o.data.vertices:
