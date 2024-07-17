@@ -5,7 +5,7 @@
 
 [Download for version 2.79](https://raw.githubusercontent.com/dskjal/Smooth-Normal/master/smooth-normal.py)  
 
-This addon edit normals. Location is Normal in tool shelf in Edit mode. 
+This addon edits normals. Location is Normal in tool shelf in Edit mode. 
 
 "set face normal" is in face select mode only.   
 
