@@ -1,4 +1,6 @@
 # Smooth-Normal
+[Download for version 4.2](https://github.com/dskjal/Smooth-Normal/releases/tag/release)
+
 [Download for version 2.79](https://raw.githubusercontent.com/dskjal/Smooth-Normal/master/smooth-normal.py)  
 
 [Download for version 2.80](https://github.com/dskjal/Smooth-Normal/blob/master/smooth-normal-280.py)  
