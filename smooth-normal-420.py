@@ -494,7 +494,7 @@ class DSKJAL_OT_PasteButton(bpy.types.Operator):
         return {'FINISHED'}
     
 def is_normal_active(ob):
-    if not hasattr(ob,'mode') or ob.mode != 'EDIT':
+    if not getattr(ob,'mode', False) or ob.mode != 'EDIT':
         return False
     return bpy.context.scene.dskjal_sn_props.ne_view_sync_mode
 
@@ -582,7 +582,7 @@ def register():
 def unregister():
     Handler_Class.remove_handle()
     bpy.app.timers.unregister(global_callback_handler)
-    if hasattr(bpy.types.Scene, "dskjal_sn_props"): del bpy.types.Scene.dskjal_sn_props
+    if getattr(bpy.types.Scene, "dskjal_sn_props", False): del bpy.types.Scene.dskjal_sn_props
 
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
